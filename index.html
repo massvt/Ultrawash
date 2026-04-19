@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UltraWash — Gestion Lavage Auto</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="logo-icon">🚗</span>
+      <span class="logo-text">Ultra<strong>Wash</strong></span>
+    </div>
+    <nav>
+      <button class="nav-btn active" data-page="dashboard">
+        <span class="icon">📊</span> Dashboard
+      </button>
+      <button class="nav-btn" data-page="entrees">
+        <span class="icon">➕</span> Entrées
+      </button>
+      <button class="nav-btn" data-page="sorties">
+        <span class="icon">➖</span> Sorties
+      </button>
+      <button class="nav-btn" data-page="historique">
+        <span class="icon">📋</span> Historique
+      </button>
+    </nav>
+  </aside>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section id="page-dashboard" class="page active">
+      <header class="page-header">
+        <h1>Dashboard</h1>
+        <div class="date-filter">
+          <select id="dashPeriod">
+            <option value="today">Aujourd'hui</option>
+            <option value="week">Cette semaine</option>
+            <option value="month" selected>Ce mois</option>
+            <option value="year">Cette année</option>
+            <option value="all">Tout</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="kpi-grid">
+        <div class="kpi-card ca">
+          <div class="kpi-label">Chiffre d'affaires</div>
+          <div class="kpi-value" id="kpi-ca">0 FCFA</div>
+          <div class="kpi-sub" id="kpi-ca-count">0 lavages</div>
+        </div>
+        <div class="kpi-card depenses">
+          <div class="kpi-label">Dépenses</div>
+          <div class="kpi-value" id="kpi-depenses">0 FCFA</div>
+          <div class="kpi-sub" id="kpi-dep-count">0 opérations</div>
+        </div>
+        <div class="kpi-card benefice">
+          <div class="kpi-label">Bénéfice net</div>
+          <div class="kpi-value" id="kpi-benefice">0 FCFA</div>
+          <div class="kpi-sub" id="kpi-marge">Marge : 0%</div>
+        </div>
+        <div class="kpi-card lavages">
+          <div class="kpi-label">Lavages du jour</div>
+          <div class="kpi-value" id="kpi-today">0</div>
+          <div class="kpi-sub" id="kpi-today-ca">0 FCFA</div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Évolution du CA</h3>
+          <canvas id="chartCA"></canvas>
+        </div>
+        <div class="chart-card small">
+          <h3>Types de lavage</h3>
+          <canvas id="chartTypes"></canvas>
+        </div>
+      </div>
+
+      <div class="recent-section">
+        <h3>Dernières opérations</h3>
+        <table class="table">
+          <thead>
+            <tr><th>Date</th><th>Type</th><th>Description</th><th>Montant</th></tr>
+          </thead>
+          <tbody id="recentTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ENTREES -->
+    <section id="page-entrees" class="page">
+      <header class="page-header">
+        <h1>Nouvelle Entrée</h1>
+      </header>
+      <div class="form-card">
+        <form id="formEntree">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="e-date" required />
+            </div>
+            <div class="form-group">
+              <label>Heure</label>
+              <input type="time" id="e-heure" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type de véhicule</label>
+              <select id="e-vehicule">
+                <option value="Voiture">Voiture</option>
+                <option value="Moto">Moto</option>
+                <option value="SUV/4x4">SUV / 4x4</option>
+                <option value="Camionnette">Camionnette</option>
+                <option value="Bus/Camion">Bus / Camion</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Type de lavage</label>
+              <select id="e-type">
+                <option value="Lavage simple">Lavage simple</option>
+                <option value="Lavage complet">Lavage complet</option>
+                <option value="Lavage intérieur">Lavage intérieur</option>
+                <option value="Lavage premium">Lavage premium</option>
+                <option value="Polissage">Polissage</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Montant (FCFA)</label>
+              <input type="number" id="e-montant" placeholder="ex: 2000" min="0" required />
+            </div>
+            <div class="form-group">
+              <label>N° plaque (optionnel)</label>
+              <input type="text" id="e-plaque" placeholder="ex: DK-1234-AB" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <input type="text" id="e-notes" placeholder="Remarques..." />
+          </div>
+          <button type="submit" class="btn-primary">Enregistrer le lavage</button>
+        </form>
+      </div>
+
+      <div class="list-section">
+        <h3>Entrées récentes</h3>
+        <table class="table">
+          <thead>
+            <tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Plaque</th><th>Montant</th><th></th></tr>
+          </thead>
+          <tbody id="entreesList"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SORTIES -->
+    <section id="page-sorties" class="page">
+      <header class="page-header">
+        <h1>Nouvelle Sortie</h1>
+      </header>
+      <div class="form-card">
+        <form id="formSortie">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="s-date" required />
+            </div>
+            <div class="form-group">
+              <label>Catégorie</label>
+              <select id="s-categorie">
+                <option value="Produits de lavage">Produits de lavage</option>
+                <option value="Salaire">Salaire</option>
+                <option value="Eau / Électricité">Eau / Électricité</option>
+                <option value="Entretien matériel">Entretien matériel</option>
+                <option value="Loyer">Loyer</option>
+                <option value="Carburant">Carburant</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Montant (FCFA)</label>
+              <input type="number" id="s-montant" placeholder="ex: 5000" min="0" required />
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" id="s-description" placeholder="Détail de la dépense..." />
+            </div>
+          </div>
+          <button type="submit" class="btn-danger">Enregistrer la dépense</button>
+        </form>
+      </div>
+
+      <div class="list-section">
+        <h3>Dépenses récentes</h3>
+        <table class="table">
+          <thead>
+            <tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Montant</th><th></th></tr>
+          </thead>
+          <tbody id="sortiesList"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- HISTORIQUE -->
+    <section id="page-historique" class="page">
+      <header class="page-header">
+        <h1>Historique complet</h1>
+        <div class="header-actions">
+          <input type="month" id="filterMonth" />
+          <button class="btn-outline" id="exportBtn">Exporter CSV</button>
+        </div>
+      </header>
+      <table class="table">
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Détail</th><th>Montant</th></tr>
+        </thead>
+        <tbody id="historiqueTable"></tbody>
+      </table>
+      <div id="historiqueEmpty" class="empty-state">Aucune opération trouvée.</div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
