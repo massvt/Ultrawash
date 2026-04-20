@@ -9,7 +9,10 @@
 </head>
 <body>
 
-  <aside class="sidebar">
+  <button id="menuToggle" class="menu-toggle" aria-label="Menu">☰</button>
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+  <aside class="sidebar" id="sidebar">
     <div class="logo">
       <img src="logo_ultrawash.webp" alt="UltraWash" class="logo-img" />
     </div>
@@ -82,12 +85,12 @@
 
       <div class="recent-section">
         <h3>Dernières opérations</h3>
-        <table class="table">
+        <div class="table-wrap"><table class="table">
           <thead>
             <tr><th>Date</th><th>Type</th><th>Description</th><th>Montant</th></tr>
           </thead>
           <tbody id="recentTable"></tbody>
-        </table>
+        </table></div>
       </div>
     </section>
 
@@ -150,12 +153,12 @@
 
       <div class="list-section">
         <h3>Entrées récentes</h3>
-        <table class="table">
+        <div class="table-wrap"><table class="table">
           <thead>
             <tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Plaque</th><th>Montant</th><th></th></tr>
           </thead>
           <tbody id="entreesList"></tbody>
-        </table>
+        </table></div>
       </div>
     </section>
 
@@ -200,12 +203,12 @@
 
       <div class="list-section">
         <h3>Dépenses récentes</h3>
-        <table class="table">
+        <div class="table-wrap"><table class="table">
           <thead>
             <tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Montant</th><th></th></tr>
           </thead>
           <tbody id="sortiesList"></tbody>
-        </table>
+        </table></div>
       </div>
     </section>
 
@@ -218,12 +221,12 @@
           <button class="btn-outline" id="exportBtn">Exporter CSV</button>
         </div>
       </header>
-      <table class="table">
+      <div class="table-wrap"><table class="table">
         <thead>
           <tr><th>Date</th><th>Type</th><th>Détail</th><th>Montant</th></tr>
         </thead>
         <tbody id="historiqueTable"></tbody>
-      </table>
+      </table></div>
       <div id="historiqueEmpty" class="empty-state">Aucune opération trouvée.</div>
     </section>
 

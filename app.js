@@ -7,6 +7,23 @@ const DB = {
 };
 
 // ===== NAVIGATION =====
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+const menuToggle = document.getElementById('menuToggle');
+
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('show');
+}
+function openSidebar() {
+  sidebar.classList.add('open');
+  overlay.classList.add('show');
+}
+menuToggle.addEventListener('click', () => {
+  sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+});
+overlay.addEventListener('click', closeSidebar);
+
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -17,6 +34,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.page === 'entrees') renderEntreesList();
     if (btn.dataset.page === 'sorties') renderSortiesList();
     if (btn.dataset.page === 'historique') renderHistorique();
+    closeSidebar();
   });
 });
 

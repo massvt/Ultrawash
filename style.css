@@ -326,17 +326,98 @@ nav { display: flex; flex-direction: column; gap: 4px; }
   font-size: 0.95rem;
 }
 
+/* ===== MENU TOGGLE (mobile) ===== */
+.menu-toggle {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 200;
+  background: var(--sidebar);
+  color: #fff;
+  border: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  font-size: 1.4rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 90;
+}
+.sidebar-overlay.show { display: block; }
+
+/* ===== TABLE SCROLL WRAPPER ===== */
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .charts-row { grid-template-columns: 1fr; }
+  .content { padding: 24px; }
 }
 
 @media (max-width: 640px) {
-  .sidebar { width: 60px; }
-  .logo-text, .nav-btn span:not(.icon) { display: none; }
-  .logo-img { max-width: 40px; }
-  .content { margin-left: 60px; padding: 16px; }
+  body { display: block; }
+
+  .menu-toggle { display: block; }
+
+  .sidebar {
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    padding-top: 64px;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .content {
+    margin-left: 0;
+    padding: 72px 14px 24px;
+  }
+
+  .logo-img { max-width: 150px; }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .page-header h1 { font-size: 1.3rem; }
+  .header-actions { width: 100%; flex-wrap: wrap; }
+  .header-actions > * { flex: 1; min-width: 140px; }
+
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi-card { padding: 14px; }
+  .kpi-value { font-size: 1.15rem; }
+  .kpi-label { font-size: 0.7rem; }
+  .kpi-sub { font-size: 0.72rem; }
+
+  .chart-card { padding: 14px; }
+  .chart-card canvas { max-height: 220px; }
+
+  .form-card { padding: 18px; }
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+
+  .recent-section, .list-section { padding: 14px; }
+
+  .table { font-size: 0.82rem; min-width: 520px; }
+  .table th, .table td { padding: 8px 10px; }
+
+  .btn-primary, .btn-danger, .btn-outline {
+    width: 100%;
+    padding: 12px;
+  }
+
+  .toast { left: 14px; right: 14px; bottom: 14px; text-align: center; }
+}
+
+@media (max-width: 380px) {
   .kpi-grid { grid-template-columns: 1fr; }
-  .form-row { grid-template-columns: 1fr; }
 }
