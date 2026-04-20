@@ -1,9 +1,53 @@
-// ===== STORAGE =====
+// ===== SUPABASE =====
+const SUPABASE_URL = 'https://hajnttnlyoftxgqsjyjl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_maWkeTvWo7H3aQzFwzyp8w_8OvgzSXf';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// In-memory cache (rempli au chargement, mis à jour après chaque mutation)
+const cache = { entrees: [], sorties: [] };
+
 const DB = {
-  getEntrees: () => JSON.parse(localStorage.getItem('uw_entrees') || '[]'),
-  getSorties: () => JSON.parse(localStorage.getItem('uw_sorties') || '[]'),
-  saveEntrees: (d) => localStorage.setItem('uw_entrees', JSON.stringify(d)),
-  saveSorties: (d) => localStorage.setItem('uw_sorties', JSON.stringify(d)),
+  getEntrees: () => cache.entrees,
+  getSorties: () => cache.sorties,
+
+  async loadAll() {
+    const [{ data: e, error: ee }, { data: s, error: se }] = await Promise.all([
+      sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false }),
+      sb.from('sorties').select('*').order('date', { ascending: false }),
+    ]);
+    if (ee) console.error('entrees:', ee);
+    if (se) console.error('sorties:', se);
+    cache.entrees = e || [];
+    cache.sorties = s || [];
+  },
+
+  async addEntree(row) {
+    const { data, error } = await sb.from('entrees').insert(row).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.entrees.unshift(data);
+    return data;
+  },
+
+  async addSortie(row) {
+    const { data, error } = await sb.from('sorties').insert(row).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.sorties.unshift(data);
+    return data;
+  },
+
+  async delEntree(id) {
+    const { error } = await sb.from('entrees').delete().eq('id', id);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.entrees = cache.entrees.filter(e => e.id !== id);
+    return true;
+  },
+
+  async delSortie(id) {
+    const { error } = await sb.from('sorties').delete().eq('id', id);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.sorties = cache.sorties.filter(s => s.id !== id);
+    return true;
+  },
 };
 
 // ===== NAVIGATION =====
@@ -85,7 +129,6 @@ function renderDashboard() {
   const ben = ca - dep;
   const marge = ca > 0 ? Math.round((ben / ca) * 100) : 0;
 
-  // KPIs aujourd'hui
   const todayEntrees = DB.getEntrees().filter(e => inPeriod(e.date, 'today'));
   const caToday = todayEntrees.reduce((a, e) => a + Number(e.montant), 0);
 
@@ -192,21 +235,19 @@ function setDefaultDateTime() {
 }
 setDefaultDateTime();
 
-document.getElementById('formEntree').addEventListener('submit', (ev) => {
+document.getElementById('formEntree').addEventListener('submit', async (ev) => {
   ev.preventDefault();
-  const entry = {
-    id: Date.now(),
+  const row = {
     date: document.getElementById('e-date').value,
     heure: document.getElementById('e-heure').value,
     vehicule: document.getElementById('e-vehicule').value,
     type: document.getElementById('e-type').value,
-    montant: document.getElementById('e-montant').value,
-    plaque: document.getElementById('e-plaque').value,
-    notes: document.getElementById('e-notes').value,
+    montant: Number(document.getElementById('e-montant').value),
+    plaque: document.getElementById('e-plaque').value || null,
+    notes: document.getElementById('e-notes').value || null,
   };
-  const list = DB.getEntrees();
-  list.unshift(entry);
-  DB.saveEntrees(list);
+  const saved = await DB.addEntree(row);
+  if (!saved) return;
   ev.target.reset();
   setDefaultDateTime();
   renderEntreesList();
@@ -223,31 +264,30 @@ function renderEntreesList() {
       <td>${e.type}</td>
       <td>${e.plaque || '—'}</td>
       <td class="montant-entree">+${fmt(e.montant)}</td>
-      <td><button class="btn-del" onclick="delEntree(${e.id})">✕</button></td>
+      <td><button class="btn-del" onclick="delEntree('${e.id}')">✕</button></td>
     </tr>
   `).join('') || '<tr><td colspan="6" class="empty-state">Aucun lavage enregistré</td></tr>';
 }
 
-function delEntree(id) {
+async function delEntree(id) {
   if (!confirm('Supprimer cette entrée ?')) return;
-  DB.saveEntrees(DB.getEntrees().filter(e => e.id !== id));
+  const ok = await DB.delEntree(id);
+  if (!ok) return;
   renderEntreesList();
   toast('Entrée supprimée', '#e53935');
 }
 
 // ===== SORTIES =====
-document.getElementById('formSortie').addEventListener('submit', (ev) => {
+document.getElementById('formSortie').addEventListener('submit', async (ev) => {
   ev.preventDefault();
-  const entry = {
-    id: Date.now(),
+  const row = {
     date: document.getElementById('s-date').value,
     categorie: document.getElementById('s-categorie').value,
-    montant: document.getElementById('s-montant').value,
-    description: document.getElementById('s-description').value,
+    montant: Number(document.getElementById('s-montant').value),
+    description: document.getElementById('s-description').value || null,
   };
-  const list = DB.getSorties();
-  list.unshift(entry);
-  DB.saveSorties(list);
+  const saved = await DB.addSortie(row);
+  if (!saved) return;
   ev.target.reset();
   setDefaultDateTime();
   renderSortiesList();
@@ -263,14 +303,15 @@ function renderSortiesList() {
       <td>${s.categorie}</td>
       <td>${s.description || '—'}</td>
       <td class="montant-sortie">-${fmt(s.montant)}</td>
-      <td><button class="btn-del" onclick="delSortie(${s.id})">✕</button></td>
+      <td><button class="btn-del" onclick="delSortie('${s.id}')">✕</button></td>
     </tr>
   `).join('') || '<tr><td colspan="5" class="empty-state">Aucune dépense enregistrée</td></tr>';
 }
 
-function delSortie(id) {
+async function delSortie(id) {
   if (!confirm('Supprimer cette dépense ?')) return;
-  DB.saveSorties(DB.getSorties().filter(s => s.id !== id));
+  const ok = await DB.delSortie(id);
+  if (!ok) return;
   renderSortiesList();
   toast('Dépense supprimée', '#e53935');
 }
@@ -335,4 +376,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 });
 
 // ===== INIT =====
-renderDashboard();
+(async () => {
+  await DB.loadAll();
+  renderDashboard();
+})();
