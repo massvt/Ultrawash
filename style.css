@@ -51,6 +51,7 @@ body {
 }
 
 .logo-icon { font-size: 1.6rem; }
+.logo-img { width: 100%; max-width: 180px; height: auto; display: block; margin: 0 auto; }
 
 nav { display: flex; flex-direction: column; gap: 4px; }
 
@@ -334,6 +335,7 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 640px) {
   .sidebar { width: 60px; }
   .logo-text, .nav-btn span:not(.icon) { display: none; }
+  .logo-img { max-width: 40px; }
   .content { margin-left: 60px; padding: 16px; }
   .kpi-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
