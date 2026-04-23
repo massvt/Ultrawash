@@ -3,6 +3,10 @@ const SUPABASE_URL = 'https://hajnttnlyoftxgqsjyjl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_maWkeTvWo7H3aQzFwzyp8w_8OvgzSXf';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// État session + rôle courant
+const session = { user: null, role: null };
+const isPatron = () => session.role === 'patron';
+
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
 const cache = { entrees: [], sorties: [] };
 
@@ -257,6 +261,7 @@ document.getElementById('formEntree').addEventListener('submit', async (ev) => {
 function renderEntreesList() {
   const list = DB.getEntrees().slice(0, 20);
   const tbody = document.getElementById('entreesList');
+  const canDelete = isPatron();
   tbody.innerHTML = list.map(e => `
     <tr>
       <td>${fmtDate(e.date)} ${e.heure || ''}</td>
@@ -264,7 +269,7 @@ function renderEntreesList() {
       <td>${e.type}</td>
       <td>${e.plaque || '—'}</td>
       <td class="montant-entree">+${fmt(e.montant)}</td>
-      <td><button class="btn-del" onclick="delEntree('${e.id}')">✕</button></td>
+      <td>${canDelete ? `<button class="btn-del" onclick="delEntree('${e.id}')">✕</button>` : ''}</td>
     </tr>
   `).join('') || '<tr><td colspan="6" class="empty-state">Aucun lavage enregistré</td></tr>';
 }
@@ -375,8 +380,99 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   toast('Export CSV téléchargé');
 });
 
+// ===== AUTH =====
+const loginScreen = document.getElementById('loginScreen');
+const formLogin = document.getElementById('formLogin');
+const loginError = document.getElementById('loginError');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+
+function showLogin() {
+  document.body.classList.remove('auth-loading', 'authed', 'role-patron', 'role-employe');
+  setTimeout(() => document.getElementById('login-email')?.focus(), 50);
+}
+
+function applyRoleUI() {
+  document.body.classList.remove('role-patron', 'role-employe');
+  document.body.classList.add('role-' + (session.role === 'patron' ? 'patron' : 'employe'));
+  document.getElementById('userEmail').textContent = session.user?.email || '';
+  document.getElementById('userRole').textContent = session.role || '';
+}
+
+function goToPage(page) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.nav-btn[data-page="${page}"]`);
+  if (btn) btn.classList.add('active');
+  document.getElementById('page-' + page)?.classList.add('active');
+}
+
+async function loadProfile() {
+  const { data, error } = await sb
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single();
+  if (error || !data) {
+    console.error('Profil introuvable', error);
+    await sb.auth.signOut();
+    session.user = null; session.role = null;
+    showLogin();
+    loginError.textContent = "Aucun profil associé. Contacte l'administrateur.";
+    return false;
+  }
+  session.role = data.role;
+  return true;
+}
+
+async function startApp() {
+  applyRoleUI();
+  document.body.classList.remove('auth-loading');
+  document.body.classList.add('authed');
+  await DB.loadAll();
+  // Page de démarrage selon le rôle
+  if (isPatron()) {
+    goToPage('dashboard');
+    renderDashboard();
+  } else {
+    goToPage('entrees');
+    renderEntreesList();
+  }
+}
+
+formLogin.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  loginError.textContent = '';
+  loginBtn.disabled = true;
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    loginError.textContent = 'Email ou mot de passe incorrect.';
+    loginBtn.disabled = false;
+    return;
+  }
+  session.user = data.user;
+  const ok = await loadProfile();
+  loginBtn.disabled = false;
+  if (!ok) return;
+  document.getElementById('login-password').value = '';
+  await startApp();
+});
+
+logoutBtn.addEventListener('click', async () => {
+  await sb.auth.signOut();
+  session.user = null; session.role = null;
+  cache.entrees = []; cache.sorties = [];
+  showLogin();
+});
+
 // ===== INIT =====
 (async () => {
-  await DB.loadAll();
-  renderDashboard();
+  const { data: { session: s } } = await sb.auth.getSession();
+  if (!s) { showLogin(); return; }
+  session.user = s.user;
+  const ok = await loadProfile();
+  if (!ok) return;
+  await startApp();
 })();

@@ -8,7 +8,27 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body>
+<body class="auth-loading">
+
+  <!-- ÉCRAN DE LOGIN -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <img src="logo_ultrawash.webp" alt="UltraWash" class="login-logo" />
+      <h1>Connexion</h1>
+      <form id="formLogin">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="login-email" autocomplete="username" required />
+        </div>
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <input type="password" id="login-password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn-primary" id="loginBtn">Se connecter</button>
+        <div id="loginError" class="login-error"></div>
+      </form>
+    </div>
+  </div>
 
   <button id="menuToggle" class="menu-toggle" aria-label="Menu">☰</button>
   <div id="sidebarOverlay" class="sidebar-overlay"></div>
@@ -18,19 +38,26 @@
       <img src="logo_ultrawash.webp" alt="UltraWash" class="logo-img" />
     </div>
     <nav>
-      <button class="nav-btn active" data-page="dashboard">
+      <button class="nav-btn active patron-only" data-page="dashboard">
         <span class="icon">📊</span> Dashboard
       </button>
       <button class="nav-btn" data-page="entrees">
         <span class="icon">➕</span> Entrées
       </button>
-      <button class="nav-btn" data-page="sorties">
+      <button class="nav-btn patron-only" data-page="sorties">
         <span class="icon">➖</span> Sorties
       </button>
       <button class="nav-btn" data-page="historique">
         <span class="icon">📋</span> Historique
       </button>
     </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-email" id="userEmail"></div>
+        <div class="user-role" id="userRole"></div>
+      </div>
+      <button id="logoutBtn" class="btn-logout">Se déconnecter</button>
+    </div>
   </aside>
 
   <main class="content">

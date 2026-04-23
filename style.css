@@ -421,3 +421,121 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 380px) {
   .kpi-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== LOGIN SCREEN ===== */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #0f172a 0%, #1a73e8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.login-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.login-logo {
+  display: block;
+  width: 90px;
+  height: auto;
+  margin: 0 auto 20px;
+}
+.login-card h1 {
+  text-align: center;
+  font-size: 1.4rem;
+  margin-bottom: 24px;
+  color: var(--text);
+}
+.login-card .form-group { margin-bottom: 14px; }
+.login-card label {
+  display: block;
+  font-size: .85rem;
+  color: var(--gray-700);
+  margin-bottom: 6px;
+}
+.login-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color .15s;
+}
+.login-card input:focus { border-color: var(--blue); }
+.login-card .btn-primary {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  font-size: 1rem;
+}
+.login-card .btn-primary:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+.login-error {
+  margin-top: 12px;
+  color: var(--red);
+  font-size: .9rem;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+/* Pendant la vérification de session au chargement, on masque tout */
+body.auth-loading .login-screen,
+body.auth-loading .sidebar,
+body.auth-loading .content,
+body.auth-loading .menu-toggle { display: none !important; }
+
+/* Une fois connecté, le login est masqué */
+body.authed .login-screen { display: none; }
+
+/* Tant que pas authentifié, on masque l'app */
+body:not(.authed) .sidebar,
+body:not(.authed) .content,
+body:not(.authed) .menu-toggle { display: none !important; }
+
+/* Masquage des éléments réservés au patron pour les employés */
+body.role-employe .patron-only { display: none !important; }
+
+/* ===== SIDEBAR FOOTER (user info + logout) ===== */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 14px 8px 4px;
+  border-top: 1px solid var(--sidebar-hover);
+}
+.user-info {
+  padding: 4px 4px 10px;
+  font-size: .82rem;
+}
+.user-email {
+  color: #fff;
+  font-weight: 500;
+  word-break: break-all;
+}
+.user-role {
+  color: var(--gray-400);
+  text-transform: uppercase;
+  font-size: .7rem;
+  letter-spacing: .5px;
+  margin-top: 2px;
+}
+.btn-logout {
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  color: #e2e8f0;
+  border: 1px solid var(--sidebar-hover);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .85rem;
+  transition: background .15s;
+}
+.btn-logout:hover { background: var(--sidebar-hover); }
