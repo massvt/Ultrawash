@@ -262,6 +262,108 @@
 
   <div id="toast" class="toast"></div>
 
+  <!-- MODAL ÉDITION -->
+  <div id="editModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="editTitle">Modifier</h3>
+        <button type="button" class="modal-close" id="editClose" aria-label="Fermer">✕</button>
+      </div>
+
+      <!-- Form Entrée -->
+      <form id="formEditEntree" class="modal-form">
+        <input type="hidden" id="ed-id" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="ed-date" required />
+          </div>
+          <div class="form-group">
+            <label>Heure</label>
+            <input type="time" id="ed-heure" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type de véhicule</label>
+            <select id="ed-vehicule">
+              <option value="Voiture">Voiture</option>
+              <option value="Moto">Moto</option>
+              <option value="SUV/4x4">SUV / 4x4</option>
+              <option value="Camionnette">Camionnette</option>
+              <option value="Bus/Camion">Bus / Camion</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Type de lavage</label>
+            <select id="ed-type">
+              <option value="Lavage simple">Lavage simple</option>
+              <option value="Lavage complet">Lavage complet</option>
+              <option value="Lavage intérieur">Lavage intérieur</option>
+              <option value="Lavage premium">Lavage premium</option>
+              <option value="Polissage">Polissage</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Montant (FCFA)</label>
+            <input type="number" id="ed-montant" min="0" required />
+          </div>
+          <div class="form-group">
+            <label>N° plaque (optionnel)</label>
+            <input type="text" id="ed-plaque" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" id="ed-notes" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" data-modal-cancel>Annuler</button>
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </div>
+      </form>
+
+      <!-- Form Sortie -->
+      <form id="formEditSortie" class="modal-form">
+        <input type="hidden" id="sd-id" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="sd-date" required />
+          </div>
+          <div class="form-group">
+            <label>Catégorie</label>
+            <select id="sd-categorie">
+              <option value="Produits de lavage">Produits de lavage</option>
+              <option value="Salaire">Salaire</option>
+              <option value="Eau / Électricité">Eau / Électricité</option>
+              <option value="Entretien matériel">Entretien matériel</option>
+              <option value="Loyer">Loyer</option>
+              <option value="Carburant">Carburant</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Montant (FCFA)</label>
+            <input type="number" id="sd-montant" min="0" required />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="sd-description" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" data-modal-cancel>Annuler</button>
+          <button type="submit" class="btn-danger">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

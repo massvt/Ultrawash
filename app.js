@@ -52,6 +52,22 @@ const DB = {
     cache.sorties = cache.sorties.filter(s => s.id !== id);
     return true;
   },
+
+  async updateEntree(id, row) {
+    const { data, error } = await sb.from('entrees').update(row).eq('id', id).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.entrees.findIndex(e => e.id === id);
+    if (i !== -1) cache.entrees[i] = data;
+    return data;
+  },
+
+  async updateSortie(id, row) {
+    const { data, error } = await sb.from('sorties').update(row).eq('id', id).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.sorties.findIndex(s => s.id === id);
+    if (i !== -1) cache.sorties[i] = data;
+    return data;
+  },
 };
 
 // ===== NAVIGATION =====
@@ -269,7 +285,7 @@ function renderEntreesList() {
       <td>${e.type}</td>
       <td>${e.plaque || '—'}</td>
       <td class="montant-entree">+${fmt(e.montant)}</td>
-      <td>${canDelete ? `<button class="btn-del" onclick="delEntree('${e.id}')">✕</button>` : ''}</td>
+      <td>${canDelete ? `<button class="btn-edit" onclick="openEditEntree('${e.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delEntree('${e.id}')" title="Supprimer">✕</button>` : ''}</td>
     </tr>
   `).join('') || '<tr><td colspan="6" class="empty-state">Aucun lavage enregistré</td></tr>';
 }
@@ -308,7 +324,7 @@ function renderSortiesList() {
       <td>${s.categorie}</td>
       <td>${s.description || '—'}</td>
       <td class="montant-sortie">-${fmt(s.montant)}</td>
-      <td><button class="btn-del" onclick="delSortie('${s.id}')">✕</button></td>
+      <td><button class="btn-edit" onclick="openEditSortie('${s.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delSortie('${s.id}')" title="Supprimer">✕</button></td>
     </tr>
   `).join('') || '<tr><td colspan="5" class="empty-state">Aucune dépense enregistrée</td></tr>';
 }
@@ -320,6 +336,92 @@ async function delSortie(id) {
   renderSortiesList();
   toast('Dépense supprimée', '#e53935');
 }
+
+// ===== MODAL ÉDITION =====
+const editModal = document.getElementById('editModal');
+const formEditEntree = document.getElementById('formEditEntree');
+const formEditSortie = document.getElementById('formEditSortie');
+
+function closeEditModal() {
+  editModal.classList.remove('show');
+  formEditEntree.classList.remove('active');
+  formEditSortie.classList.remove('active');
+}
+
+document.getElementById('editClose').addEventListener('click', closeEditModal);
+editModal.addEventListener('click', (ev) => { if (ev.target === editModal) closeEditModal(); });
+document.querySelectorAll('[data-modal-cancel]').forEach(b => b.addEventListener('click', closeEditModal));
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && editModal.classList.contains('show')) closeEditModal(); });
+
+function openEditEntree(id) {
+  const e = DB.getEntrees().find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('editTitle').textContent = 'Modifier le lavage';
+  document.getElementById('ed-id').value = e.id;
+  document.getElementById('ed-date').value = e.date;
+  document.getElementById('ed-heure').value = (e.heure || '').slice(0, 5);
+  document.getElementById('ed-vehicule').value = e.vehicule;
+  document.getElementById('ed-type').value = e.type;
+  document.getElementById('ed-montant').value = e.montant;
+  document.getElementById('ed-plaque').value = e.plaque || '';
+  document.getElementById('ed-notes').value = e.notes || '';
+  formEditSortie.classList.remove('active');
+  formEditEntree.classList.add('active');
+  editModal.classList.add('show');
+}
+
+function openEditSortie(id) {
+  const s = DB.getSorties().find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('editTitle').textContent = 'Modifier la dépense';
+  document.getElementById('sd-id').value = s.id;
+  document.getElementById('sd-date').value = s.date;
+  document.getElementById('sd-categorie').value = s.categorie;
+  document.getElementById('sd-montant').value = s.montant;
+  document.getElementById('sd-description').value = s.description || '';
+  formEditEntree.classList.remove('active');
+  formEditSortie.classList.add('active');
+  editModal.classList.add('show');
+}
+
+formEditEntree.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const id = document.getElementById('ed-id').value;
+  const row = {
+    date: document.getElementById('ed-date').value,
+    heure: document.getElementById('ed-heure').value,
+    vehicule: document.getElementById('ed-vehicule').value,
+    type: document.getElementById('ed-type').value,
+    montant: Number(document.getElementById('ed-montant').value),
+    plaque: document.getElementById('ed-plaque').value || null,
+    notes: document.getElementById('ed-notes').value || null,
+  };
+  const saved = await DB.updateEntree(id, row);
+  if (!saved) return;
+  closeEditModal();
+  renderEntreesList();
+  if (document.getElementById('page-dashboard').classList.contains('active')) renderDashboard();
+  if (document.getElementById('page-historique').classList.contains('active')) renderHistorique();
+  toast('Lavage mis à jour !');
+});
+
+formEditSortie.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const id = document.getElementById('sd-id').value;
+  const row = {
+    date: document.getElementById('sd-date').value,
+    categorie: document.getElementById('sd-categorie').value,
+    montant: Number(document.getElementById('sd-montant').value),
+    description: document.getElementById('sd-description').value || null,
+  };
+  const saved = await DB.updateSortie(id, row);
+  if (!saved) return;
+  closeEditModal();
+  renderSortiesList();
+  if (document.getElementById('page-dashboard').classList.contains('active')) renderDashboard();
+  if (document.getElementById('page-historique').classList.contains('active')) renderHistorique();
+  toast('Dépense mise à jour !', '#f59e0b');
+});
 
 // ===== HISTORIQUE =====
 function renderHistorique() {
