@@ -424,25 +424,70 @@ formEditSortie.addEventListener('submit', async (ev) => {
 });
 
 // ===== HISTORIQUE =====
+function getFilters() {
+  return {
+    kind: document.getElementById('f-kind').value,
+    from: document.getElementById('f-from').value,
+    to: document.getElementById('f-to').value,
+    vehicule: document.getElementById('f-vehicule').value,
+    plaque: document.getElementById('f-plaque').value.trim().toLowerCase(),
+    categorie: document.getElementById('f-categorie').value,
+  };
+}
+
+function applyFilters(ops, f) {
+  return ops.filter(op => {
+    if (f.kind && op.kind !== f.kind) return false;
+    if (f.from && op.date < f.from) return false;
+    if (f.to && op.date > f.to) return false;
+    if (op.kind === 'entree') {
+      if (f.vehicule && op.vehicule !== f.vehicule) return false;
+      if (f.plaque && !(op.plaque || '').toLowerCase().includes(f.plaque)) return false;
+    } else {
+      if (f.categorie && op.categorie !== f.categorie) return false;
+    }
+    return true;
+  });
+}
+
+function updateFilterVisibility() {
+  const kind = document.getElementById('f-kind').value;
+  document.querySelectorAll('.filter-entree-only').forEach(el => {
+    el.style.display = (kind === '' || kind === 'entree') ? '' : 'none';
+  });
+  document.querySelectorAll('.filter-sortie-only').forEach(el => {
+    el.style.display = (kind === '' || kind === 'sortie') ? '' : 'none';
+  });
+}
+
 function renderHistorique() {
-  const month = document.getElementById('filterMonth').value;
-  let all = [
+  updateFilterVisibility();
+  const f = getFilters();
+  const all = [
     ...DB.getEntrees().map(e => ({ ...e, kind: 'entree' })),
     ...DB.getSorties().map(s => ({ ...s, kind: 'sortie' }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  if (month) {
-    all = all.filter(op => op.date && op.date.startsWith(month));
+  const filtered = applyFilters(all, f);
+
+  // Résumé
+  const totalEntrees = filtered.filter(o => o.kind === 'entree').reduce((a, o) => a + Number(o.montant), 0);
+  const totalSorties = filtered.filter(o => o.kind === 'sortie').reduce((a, o) => a + Number(o.montant), 0);
+  const summary = document.getElementById('filterSummary');
+  if (filtered.length > 0) {
+    summary.textContent = `${filtered.length} résultat${filtered.length > 1 ? 's' : ''} · Entrées : ${fmt(totalEntrees)} · Dépenses : ${fmt(totalSorties)}`;
+  } else {
+    summary.textContent = '';
   }
 
   const tbody = document.getElementById('historiqueTable');
   const empty = document.getElementById('historiqueEmpty');
-  if (all.length === 0) {
+  if (filtered.length === 0) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
   } else {
     empty.style.display = 'none';
-    tbody.innerHTML = all.map(op => `
+    tbody.innerHTML = filtered.map(op => `
       <tr>
         <td>${fmtDate(op.date)}</td>
         <td><span class="badge badge-${op.kind}">${op.kind === 'entree' ? 'Lavage' : 'Dépense'}</span></td>
@@ -453,30 +498,47 @@ function renderHistorique() {
   }
 }
 
-document.getElementById('filterMonth').addEventListener('change', renderHistorique);
+['f-kind','f-from','f-to','f-vehicule','f-plaque','f-categorie'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderHistorique);
+  document.getElementById(id).addEventListener('change', renderHistorique);
+});
+
+document.getElementById('f-reset').addEventListener('click', () => {
+  ['f-kind','f-from','f-to','f-vehicule','f-plaque','f-categorie'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  renderHistorique();
+});
 
 // ===== EXPORT CSV =====
 document.getElementById('exportBtn').addEventListener('click', () => {
-  const month = document.getElementById('filterMonth').value;
-  let all = [
-    ...DB.getEntrees().map(e => ({ ...e, kind: 'Lavage' })),
-    ...DB.getSorties().map(s => ({ ...s, kind: 'Dépense' }))
+  const f = getFilters();
+  const all = [
+    ...DB.getEntrees().map(e => ({ ...e, kind: 'entree' })),
+    ...DB.getSorties().map(s => ({ ...s, kind: 'sortie' }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
-  if (month) all = all.filter(op => op.date && op.date.startsWith(month));
+  const filtered = applyFilters(all, f);
+
+  if (filtered.length === 0) {
+    toast('Aucune donnée à exporter', '#f59e0b');
+    return;
+  }
 
   const header = 'Date,Type,Détail,Montant (FCFA)\n';
-  const rows = all.map(op => {
-    const detail = op.kind === 'Lavage'
+  const rows = filtered.map(op => {
+    const label = op.kind === 'entree' ? 'Lavage' : 'Dépense';
+    const detail = op.kind === 'entree'
       ? `${op.vehicule} - ${op.type}${op.plaque ? ' [' + op.plaque + ']' : ''}`
       : `${op.categorie}${op.description ? ' - ' + op.description : ''}`;
-    const sign = op.kind === 'Lavage' ? '' : '-';
-    return `${op.date},${op.kind},"${detail}",${sign}${op.montant}`;
+    const sign = op.kind === 'entree' ? '' : '-';
+    return `${op.date},${label},"${detail}",${sign}${op.montant}`;
   }).join('\n');
 
   const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url;
-  a.download = `ultrawash_${month || 'export'}.csv`;
+  const tag = f.from || f.to ? `${f.from || 'debut'}_${f.to || 'fin'}` : 'export';
+  a.download = `ultrawash_${tag}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   toast('Export CSV téléchargé');

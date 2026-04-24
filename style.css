@@ -110,6 +110,47 @@ nav { display: flex; flex-direction: column; gap: 4px; }
   cursor: pointer;
 }
 
+/* ===== FILTER BAR ===== */
+.filter-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  background: #fff;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--gray-100);
+  margin-bottom: 14px;
+}
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label {
+  font-size: 0.75rem;
+  color: var(--gray-500, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+.filter-group input,
+.filter-group select {
+  border: 1px solid var(--gray-200);
+  background: #fff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.filter-group input:focus,
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+.filter-group.filter-reset button { padding: 8px 12px; }
+
+.filter-summary {
+  font-size: 0.85rem;
+  color: var(--gray-500, #64748b);
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
 /* ===== KPI GRID ===== */
 .kpi-grid {
   display: grid;

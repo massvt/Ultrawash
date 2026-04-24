@@ -245,10 +245,62 @@
       <header class="page-header">
         <h1>Historique complet</h1>
         <div class="header-actions">
-          <input type="month" id="filterMonth" />
           <button class="btn-outline" id="exportBtn">Exporter CSV</button>
         </div>
       </header>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Type</label>
+          <select id="f-kind">
+            <option value="">Tout</option>
+            <option value="entree">Lavages</option>
+            <option value="sortie">Dépenses</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Du</label>
+          <input type="date" id="f-from" />
+        </div>
+        <div class="filter-group">
+          <label>Au</label>
+          <input type="date" id="f-to" />
+        </div>
+        <div class="filter-group filter-entree-only">
+          <label>Véhicule</label>
+          <select id="f-vehicule">
+            <option value="">Tous</option>
+            <option value="Voiture">Voiture</option>
+            <option value="Moto">Moto</option>
+            <option value="SUV/4x4">SUV / 4x4</option>
+            <option value="Camionnette">Camionnette</option>
+            <option value="Bus/Camion">Bus / Camion</option>
+          </select>
+        </div>
+        <div class="filter-group filter-entree-only">
+          <label>Plaque</label>
+          <input type="text" id="f-plaque" placeholder="ex: DK-1234" />
+        </div>
+        <div class="filter-group filter-sortie-only">
+          <label>Catégorie</label>
+          <select id="f-categorie">
+            <option value="">Toutes</option>
+            <option value="Produits de lavage">Produits de lavage</option>
+            <option value="Salaire">Salaire</option>
+            <option value="Eau / Électricité">Eau / Électricité</option>
+            <option value="Entretien matériel">Entretien matériel</option>
+            <option value="Loyer">Loyer</option>
+            <option value="Carburant">Carburant</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </div>
+        <div class="filter-group filter-reset">
+          <label>&nbsp;</label>
+          <button type="button" class="btn-outline" id="f-reset">Réinitialiser</button>
+        </div>
+      </div>
+
+      <div class="filter-summary" id="filterSummary"></div>
       <div class="table-wrap"><table class="table">
         <thead>
           <tr><th>Date</th><th>Type</th><th>Détail</th><th>Montant</th></tr>
