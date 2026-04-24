@@ -436,14 +436,18 @@ function getFilters() {
 }
 
 function applyFilters(ops, f) {
+  const entreeFilterActive = f.vehicule || f.plaque;
+  const sortieFilterActive = f.categorie;
   return ops.filter(op => {
     if (f.kind && op.kind !== f.kind) return false;
     if (f.from && op.date < f.from) return false;
     if (f.to && op.date > f.to) return false;
     if (op.kind === 'entree') {
+      if (sortieFilterActive) return false;
       if (f.vehicule && op.vehicule !== f.vehicule) return false;
       if (f.plaque && !(op.plaque || '').toLowerCase().includes(f.plaque)) return false;
     } else {
+      if (entreeFilterActive) return false;
       if (f.categorie && op.categorie !== f.categorie) return false;
     }
     return true;
