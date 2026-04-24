@@ -67,19 +67,20 @@
       <header class="page-header">
         <h1>Dashboard</h1>
         <div class="date-filter">
-          <div class="period-nav">
-            <button type="button" class="period-arrow" id="periodPrev" aria-label="Période précédente">◀</button>
-            <span class="period-label" id="periodLabel">—</span>
-            <button type="button" class="period-arrow" id="periodNext" aria-label="Période suivante">▶</button>
-          </div>
-          <select id="dashPeriod">
-            <option value="today">Jour</option>
-            <option value="week">Semaine</option>
-            <option value="month" selected>Mois</option>
-            <option value="year">Année</option>
+          <select id="dashPreset">
+            <option value="today">Aujourd'hui</option>
+            <option value="week">Cette semaine</option>
+            <option value="month" selected>Ce mois</option>
+            <option value="year">Cette année</option>
             <option value="all">Tout</option>
+            <option value="custom">Personnalisée</option>
           </select>
-          <button type="button" class="btn-outline period-today" id="periodToday">Aujourd'hui</button>
+          <div class="period-range">
+            <label>Du</label>
+            <input type="date" id="dashFrom" />
+            <label>Au</label>
+            <input type="date" id="dashTo" />
+          </div>
         </div>
       </header>
 

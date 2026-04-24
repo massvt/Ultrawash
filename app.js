@@ -116,78 +116,60 @@ const fmt = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
 const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR');
 
 // ===== PERIOD FILTER =====
-const dashState = { type: 'month', offset: 0 };
+const ymd = (d) => d.toISOString().slice(0, 10);
 
-function getPeriodRange(type, offset) {
+function presetRange(preset) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let start, end;
-  if (type === 'today') {
-    start = new Date(today); start.setDate(today.getDate() + offset);
-    end = new Date(start); end.setDate(start.getDate() + 1);
-  } else if (type === 'week') {
-    start = new Date(today); start.setDate(today.getDate() - today.getDay() + offset * 7);
-    end = new Date(start); end.setDate(start.getDate() + 7);
-  } else if (type === 'month') {
-    start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
-  } else if (type === 'year') {
-    start = new Date(now.getFullYear() + offset, 0, 1);
-    end = new Date(now.getFullYear() + offset + 1, 0, 1);
-  } else {
-    return { start: null, end: null };
+  if (preset === 'today') return { from: ymd(today), to: ymd(today) };
+  if (preset === 'week') {
+    const start = new Date(today); start.setDate(today.getDate() - today.getDay());
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    return { from: ymd(start), to: ymd(end) };
   }
-  return { start, end };
+  if (preset === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: ymd(start), to: ymd(end) };
+  }
+  if (preset === 'year') {
+    return { from: `${now.getFullYear()}-01-01`, to: `${now.getFullYear()}-12-31` };
+  }
+  return { from: '', to: '' };
 }
 
-function getPeriodLabel(type, offset) {
-  const { start, end } = getPeriodRange(type, offset);
-  if (type === 'all') return 'Toutes les données';
-  if (type === 'today') {
-    if (offset === 0) return "Aujourd'hui";
-    if (offset === -1) return 'Hier';
-    return start.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-  }
-  if (type === 'week') {
-    const endDisplay = new Date(end); endDisplay.setDate(end.getDate() - 1);
-    const startStr = start.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-    const endStr = endDisplay.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-    return `${startStr} – ${endStr}`;
-  }
-  if (type === 'month') {
-    return start.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  }
-  if (type === 'year') {
-    return String(start.getFullYear());
-  }
-  return '';
-}
-
-function inRange(dateStr, range) {
-  if (!range.start) return true;
-  const d = new Date(dateStr);
-  return d >= range.start && d < range.end;
+function inDashRange(dateStr) {
+  const from = document.getElementById('dashFrom').value;
+  const to = document.getElementById('dashTo').value;
+  if (from && dateStr < from) return false;
+  if (to && dateStr > to) return false;
+  return true;
 }
 
 function inToday(dateStr) {
-  return inRange(dateStr, getPeriodRange('today', 0));
+  const t = ymd(new Date());
+  return dateStr === t;
 }
 
 // ===== DASHBOARD =====
 let chartCA = null, chartTypes = null, chartCategories = null, chartVehicules = null, chartHeures = null;
 
-function renderDashboard() {
-  const period = dashState.type;
-  const range = getPeriodRange(dashState.type, dashState.offset);
-  const entrees = DB.getEntrees().filter(e => inRange(e.date, range));
-  const sorties = DB.getSorties().filter(s => inRange(s.date, range));
+function getDashPeriodType() {
+  // Pour le groupement du graphique CA vs Dépenses
+  const from = document.getElementById('dashFrom').value;
+  const to = document.getElementById('dashTo').value;
+  if (!from && !to) return 'all';
+  if (from === to) return 'today';
+  const diff = (new Date(to) - new Date(from)) / 86400000;
+  if (diff <= 7) return 'week';
+  if (diff <= 31) return 'month';
+  return 'year';
+}
 
-  // Label + état des boutons
-  document.getElementById('periodLabel').textContent = getPeriodLabel(dashState.type, dashState.offset);
-  const navDisabled = dashState.type === 'all';
-  document.getElementById('periodPrev').disabled = navDisabled;
-  document.getElementById('periodNext').disabled = navDisabled || dashState.offset >= 0;
-  document.getElementById('periodToday').style.display = (dashState.offset !== 0 && !navDisabled) ? '' : 'none';
+function renderDashboard() {
+  const entrees = DB.getEntrees().filter(e => inDashRange(e.date));
+  const sorties = DB.getSorties().filter(s => inDashRange(s.date));
+  const period = getDashPeriodType();
 
   const ca = entrees.reduce((a, e) => a + Number(e.montant), 0);
   const dep = sorties.reduce((a, s) => a + Number(s.montant), 0);
@@ -404,28 +386,27 @@ function renderRecentTable() {
   `).join('') || '<tr><td colspan="4" class="empty-state">Aucune opération</td></tr>';
 }
 
-document.getElementById('dashPeriod').addEventListener('change', (ev) => {
-  dashState.type = ev.target.value;
-  dashState.offset = 0;
+function applyPreset(preset) {
+  const { from, to } = presetRange(preset);
+  document.getElementById('dashFrom').value = from;
+  document.getElementById('dashTo').value = to;
   renderDashboard();
+}
+
+document.getElementById('dashPreset').addEventListener('change', (ev) => {
+  if (ev.target.value === 'custom') return;
+  applyPreset(ev.target.value);
 });
 
-document.getElementById('periodPrev').addEventListener('click', () => {
-  if (dashState.type === 'all') return;
-  dashState.offset -= 1;
-  renderDashboard();
+['dashFrom', 'dashTo'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    document.getElementById('dashPreset').value = 'custom';
+    renderDashboard();
+  });
 });
 
-document.getElementById('periodNext').addEventListener('click', () => {
-  if (dashState.type === 'all' || dashState.offset >= 0) return;
-  dashState.offset += 1;
-  renderDashboard();
-});
-
-document.getElementById('periodToday').addEventListener('click', () => {
-  dashState.offset = 0;
-  renderDashboard();
-});
+// Initialiser avec le preset par défaut (mois en cours)
+applyPreset('month');
 
 // ===== ENTREES =====
 function setDefaultDateTime() {

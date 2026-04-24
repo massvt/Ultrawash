@@ -112,37 +112,28 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 
 .date-filter { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-.period-nav {
+.period-range {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   background: #fff;
   border: 1px solid var(--gray-200);
   border-radius: 8px;
-  padding: 2px 4px;
+  padding: 4px 10px;
 }
-.period-arrow {
-  background: none;
-  border: none;
-  padding: 6px 10px;
-  cursor: pointer;
-  color: var(--gray-700);
-  font-size: 0.75rem;
-  border-radius: 6px;
-  transition: background .15s;
-}
-.period-arrow:hover:not(:disabled) { background: var(--gray-100); color: var(--blue); }
-.period-arrow:disabled { opacity: .3; cursor: not-allowed; }
-
-.period-label {
-  font-size: 0.9rem;
+.period-range label {
+  font-size: 0.8rem;
+  color: var(--gray-500, #64748b);
   font-weight: 600;
-  color: var(--gray-700);
-  padding: 0 8px;
-  min-width: 110px;
-  text-align: center;
 }
-.period-today { padding: 8px 12px; font-size: 0.85rem; }
+.period-range input {
+  border: none;
+  background: transparent;
+  padding: 4px 2px;
+  font-size: 0.88rem;
+  color: var(--gray-700);
+}
+.period-range input:focus { outline: none; }
 
 /* ===== FILTER BAR ===== */
 .filter-bar {
