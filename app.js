@@ -116,16 +116,17 @@ const fmt = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
 const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR');
 
 // ===== PERIOD FILTER =====
-const ymd = (d) => d.toISOString().slice(0, 10);
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 function presetRange(preset) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (preset === 'today') return { from: ymd(today), to: ymd(today) };
   if (preset === 'week') {
-    const start = new Date(today); start.setDate(today.getDate() - today.getDay());
-    const end = new Date(start); end.setDate(start.getDate() + 6);
-    return { from: ymd(start), to: ymd(end) };
+    // Lundi = début de semaine, fin = aujourd'hui
+    const daysSinceMonday = (today.getDay() + 6) % 7;
+    const start = new Date(today); start.setDate(today.getDate() - daysSinceMonday);
+    return { from: ymd(start), to: ymd(today) };
   }
   if (preset === 'month') {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
