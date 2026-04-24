@@ -137,7 +137,7 @@ function inPeriod(dateStr, period) {
 }
 
 // ===== DASHBOARD =====
-let chartCA = null, chartTypes = null;
+let chartCA = null, chartTypes = null, chartCategories = null, chartVehicules = null, chartHeures = null;
 
 function renderDashboard() {
   const period = document.getElementById('dashPeriod').value;
@@ -152,6 +152,14 @@ function renderDashboard() {
   const todayEntrees = DB.getEntrees().filter(e => inPeriod(e.date, 'today'));
   const caToday = todayEntrees.reduce((a, e) => a + Number(e.montant), 0);
 
+  const panier = entrees.length > 0 ? Math.round(ca / entrees.length) : 0;
+
+  // Meilleur jour
+  const caByDay = {};
+  entrees.forEach(e => { caByDay[e.date] = (caByDay[e.date] || 0) + Number(e.montant); });
+  let bestDay = null, bestDayCA = 0;
+  Object.entries(caByDay).forEach(([d, v]) => { if (v > bestDayCA) { bestDay = d; bestDayCA = v; } });
+
   document.getElementById('kpi-ca').textContent = fmt(ca);
   document.getElementById('kpi-ca-count').textContent = entrees.length + ' lavage' + (entrees.length > 1 ? 's' : '');
   document.getElementById('kpi-depenses').textContent = fmt(dep);
@@ -160,43 +168,56 @@ function renderDashboard() {
   document.getElementById('kpi-marge').textContent = 'Marge : ' + marge + '%';
   document.getElementById('kpi-today').textContent = todayEntrees.length;
   document.getElementById('kpi-today-ca').textContent = fmt(caToday);
+  document.getElementById('kpi-panier').textContent = fmt(panier);
+  document.getElementById('kpi-bestday').textContent = bestDay ? fmtDate(bestDay) : '—';
+  document.getElementById('kpi-bestday-ca').textContent = fmt(bestDayCA);
 
-  renderChartCA(entrees, period);
+  renderChartCA(entrees, sorties, period);
   renderChartTypes(entrees);
+  renderChartCategories(sorties);
+  renderChartVehicules(entrees);
+  renderChartHeures(entrees);
   renderRecentTable();
 }
 
-function renderChartCA(entrees, period) {
+function periodKey(dateStr, heure, period) {
+  const d = new Date(dateStr);
+  if (period === 'today') return heure ? heure.slice(0,2) + 'h' : '?';
+  if (period === 'week' || period === 'month') return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  return d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+}
+
+function renderChartCA(entrees, sorties, period) {
   const ctx = document.getElementById('chartCA').getContext('2d');
   if (chartCA) chartCA.destroy();
 
-  const grouped = {};
+  const caByKey = {};
   entrees.forEach(e => {
-    const d = new Date(e.date);
-    let key;
-    if (period === 'today') key = e.heure ? e.heure.slice(0,2) + 'h' : '?';
-    else if (period === 'week' || period === 'month') key = d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-    else key = d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
-    grouped[key] = (grouped[key] || 0) + Number(e.montant);
+    const key = periodKey(e.date, e.heure, period);
+    caByKey[key] = (caByKey[key] || 0) + Number(e.montant);
+  });
+  const depByKey = {};
+  sorties.forEach(s => {
+    const key = periodKey(s.date, null, period);
+    depByKey[key] = (depByKey[key] || 0) + Number(s.montant);
   });
 
-  const labels = Object.keys(grouped);
-  const values = Object.values(grouped);
+  const labels = [...new Set([...Object.keys(caByKey), ...Object.keys(depByKey)])];
+  const caValues = labels.map(k => caByKey[k] || 0);
+  const depValues = labels.map(k => depByKey[k] || 0);
 
   chartCA = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
-      datasets: [{
-        label: 'CA (FCFA)',
-        data: values,
-        backgroundColor: '#1a73e8',
-        borderRadius: 6,
-      }]
+      datasets: [
+        { label: 'CA', data: caValues, backgroundColor: '#1a73e8', borderRadius: 6 },
+        { label: 'Dépenses', data: depValues, backgroundColor: '#e53935', borderRadius: 6 },
+      ]
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
       scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString('fr-FR') } } }
     }
   });
@@ -223,6 +244,100 @@ function renderChartTypes(entrees) {
     options: {
       responsive: true,
       plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
+    }
+  });
+}
+
+function renderChartCategories(sorties) {
+  const ctx = document.getElementById('chartCategories').getContext('2d');
+  if (chartCategories) chartCategories.destroy();
+
+  const cats = {};
+  sorties.forEach(s => { cats[s.categorie] = (cats[s.categorie] || 0) + Number(s.montant); });
+  const labels = Object.keys(cats);
+  if (labels.length === 0) return;
+
+  chartCategories = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: Object.values(cats),
+        backgroundColor: ['#e53935','#f59e0b','#8b5cf6','#14b8a6','#0d9e6e','#1a73e8','#64748b'],
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { label: (c) => c.label + ' : ' + fmt(c.parsed) } }
+      }
+    }
+  });
+}
+
+function renderChartVehicules(entrees) {
+  const ctx = document.getElementById('chartVehicules').getContext('2d');
+  if (chartVehicules) chartVehicules.destroy();
+
+  const vehs = {};
+  entrees.forEach(e => { vehs[e.vehicule] = (vehs[e.vehicule] || 0) + 1; });
+  const labels = Object.keys(vehs);
+  if (labels.length === 0) return;
+
+  chartVehicules = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Nombre',
+        data: Object.values(vehs),
+        backgroundColor: '#1a73e8',
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+function renderChartHeures(entrees) {
+  const ctx = document.getElementById('chartHeures').getContext('2d');
+  if (chartHeures) chartHeures.destroy();
+
+  const hours = Array.from({ length: 24 }, (_, i) => 0);
+  entrees.forEach(e => {
+    if (!e.heure) return;
+    const h = parseInt(e.heure.slice(0, 2), 10);
+    if (!isNaN(h)) hours[h]++;
+  });
+
+  // On n'affiche que les heures d'ouverture probable (6h-22h)
+  const start = 6, end = 22;
+  const labels = [];
+  const data = [];
+  for (let h = start; h <= end; h++) { labels.push(h + 'h'); data.push(hours[h]); }
+
+  chartHeures = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Lavages',
+        data,
+        backgroundColor: '#0d9e6e',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
 }

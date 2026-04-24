@@ -98,16 +98,44 @@
           <div class="kpi-value" id="kpi-today">0</div>
           <div class="kpi-sub" id="kpi-today-ca">0 FCFA</div>
         </div>
+        <div class="kpi-card panier">
+          <div class="kpi-label">Panier moyen</div>
+          <div class="kpi-value" id="kpi-panier">0 FCFA</div>
+          <div class="kpi-sub" id="kpi-panier-sub">par lavage</div>
+        </div>
+        <div class="kpi-card bestday">
+          <div class="kpi-label">Meilleur jour</div>
+          <div class="kpi-value" id="kpi-bestday">—</div>
+          <div class="kpi-sub" id="kpi-bestday-ca">0 FCFA</div>
+        </div>
       </div>
 
       <div class="charts-row">
         <div class="chart-card">
-          <h3>Évolution du CA</h3>
+          <h3>CA vs Dépenses</h3>
           <canvas id="chartCA"></canvas>
         </div>
         <div class="chart-card small">
           <h3>Types de lavage</h3>
           <canvas id="chartTypes"></canvas>
+        </div>
+      </div>
+
+      <div class="charts-row charts-row-2">
+        <div class="chart-card">
+          <h3>Dépenses par catégorie</h3>
+          <canvas id="chartCategories"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Véhicules traités</h3>
+          <canvas id="chartVehicules"></canvas>
+        </div>
+      </div>
+
+      <div class="charts-row charts-row-full">
+        <div class="chart-card">
+          <h3>Heures de pointe</h3>
+          <canvas id="chartHeures"></canvas>
         </div>
       </div>
 
