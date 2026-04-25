@@ -137,16 +137,20 @@
 
       <div class="charts-row charts-row-2">
         <div class="chart-card">
+          <h3>Services par catégorie</h3>
+          <canvas id="chartServiceCat"></canvas>
+        </div>
+        <div class="chart-card">
           <h3>Dépenses par catégorie</h3>
           <canvas id="chartCategories"></canvas>
         </div>
+      </div>
+
+      <div class="charts-row charts-row-2">
         <div class="chart-card">
           <h3>Véhicules traités</h3>
           <canvas id="chartVehicules"></canvas>
         </div>
-      </div>
-
-      <div class="charts-row charts-row-full">
         <div class="chart-card">
           <h3>Heures de pointe</h3>
           <canvas id="chartHeures"></canvas>
@@ -204,13 +208,37 @@
               </select>
             </div>
             <div class="form-group">
-              <label>Type de lavage</label>
+              <label>Type de service</label>
               <select id="e-type">
-                <option value="Lavage simple">Lavage simple</option>
-                <option value="Lavage complet">Lavage complet</option>
-                <option value="Lavage intérieur">Lavage intérieur</option>
-                <option value="Lavage premium">Lavage premium</option>
-                <option value="Polissage">Polissage</option>
+                <optgroup label="🧼 Lavage">
+                  <option>Lavage Moto</option>
+                  <option>Lavage Moquette</option>
+                  <option selected>Lavage Standard</option>
+                  <option>Lavage Professionnel</option>
+                  <option>Lavage Complet</option>
+                  <option>Lavage Premium</option>
+                  <option>Autre Lavage</option>
+                </optgroup>
+                <optgroup label="✨ Detailing automobile">
+                  <option>Polissage</option>
+                  <option>Lustrage</option>
+                  <option>Protection Nano-céramique</option>
+                  <option>Film solaire &amp; anti-UV</option>
+                  <option>Habillage / Covering</option>
+                </optgroup>
+                <optgroup label="🔧 Entretien rapide">
+                  <option>Changement pneus</option>
+                  <option>Réparation pneus</option>
+                  <option>Équilibrage</option>
+                  <option>Parallélisme</option>
+                  <option>Vidange</option>
+                  <option>Filtre à air</option>
+                  <option>Filtre à huile</option>
+                  <option>Filtre à gazoil</option>
+                  <option>Entretien climatisation</option>
+                  <option>Freins</option>
+                  <option>Reprogrammation calculateur</option>
+                </optgroup>
               </select>
             </div>
           </div>
@@ -522,13 +550,37 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Type de lavage</label>
+            <label>Type de service</label>
             <select id="ed-type">
-              <option value="Lavage simple">Lavage simple</option>
-              <option value="Lavage complet">Lavage complet</option>
-              <option value="Lavage intérieur">Lavage intérieur</option>
-              <option value="Lavage premium">Lavage premium</option>
-              <option value="Polissage">Polissage</option>
+              <optgroup label="🧼 Lavage">
+                <option>Lavage Moto</option>
+                <option>Lavage Moquette</option>
+                <option>Lavage Standard</option>
+                <option>Lavage Professionnel</option>
+                <option>Lavage Complet</option>
+                <option>Lavage Premium</option>
+                <option>Autre Lavage</option>
+              </optgroup>
+              <optgroup label="✨ Detailing automobile">
+                <option>Polissage</option>
+                <option>Lustrage</option>
+                <option>Protection Nano-céramique</option>
+                <option>Film solaire &amp; anti-UV</option>
+                <option>Habillage / Covering</option>
+              </optgroup>
+              <optgroup label="🔧 Entretien rapide">
+                <option>Changement pneus</option>
+                <option>Réparation pneus</option>
+                <option>Équilibrage</option>
+                <option>Parallélisme</option>
+                <option>Vidange</option>
+                <option>Filtre à air</option>
+                <option>Filtre à huile</option>
+                <option>Filtre à gazoil</option>
+                <option>Entretien climatisation</option>
+                <option>Freins</option>
+                <option>Reprogrammation calculateur</option>
+              </optgroup>
             </select>
           </div>
         </div>
@@ -750,13 +802,37 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label>Type de lavage</label>
+            <label>Type de service</label>
             <select id="r-type">
-              <option value="Lavage simple">Lavage simple</option>
-              <option value="Lavage complet">Lavage complet</option>
-              <option value="Lavage intérieur">Lavage intérieur</option>
-              <option value="Lavage premium">Lavage premium</option>
-              <option value="Polissage">Polissage</option>
+              <optgroup label="🧼 Lavage">
+                <option>Lavage Moto</option>
+                <option>Lavage Moquette</option>
+                <option selected>Lavage Standard</option>
+                <option>Lavage Professionnel</option>
+                <option>Lavage Complet</option>
+                <option>Lavage Premium</option>
+                <option>Autre Lavage</option>
+              </optgroup>
+              <optgroup label="✨ Detailing automobile">
+                <option>Polissage</option>
+                <option>Lustrage</option>
+                <option>Protection Nano-céramique</option>
+                <option>Film solaire &amp; anti-UV</option>
+                <option>Habillage / Covering</option>
+              </optgroup>
+              <optgroup label="🔧 Entretien rapide">
+                <option>Changement pneus</option>
+                <option>Réparation pneus</option>
+                <option>Équilibrage</option>
+                <option>Parallélisme</option>
+                <option>Vidange</option>
+                <option>Filtre à air</option>
+                <option>Filtre à huile</option>
+                <option>Filtre à gazoil</option>
+                <option>Entretien climatisation</option>
+                <option>Freins</option>
+                <option>Reprogrammation calculateur</option>
+              </optgroup>
             </select>
           </div>
           <div class="form-group">

@@ -258,7 +258,25 @@ function inToday(dateStr) {
 }
 
 // ===== DASHBOARD =====
-let chartCA = null, chartTypes = null, chartCategories = null, chartVehicules = null, chartHeures = null;
+let chartCA = null, chartTypes = null, chartCategories = null, chartVehicules = null, chartHeures = null, chartServiceCat = null;
+
+// Mapping libellé service → grande catégorie (pour stats dashboard)
+const SERVICE_CATEGORY = {
+  // Lavage
+  'Lavage Moto': 'Lavage', 'Lavage Moquette': 'Lavage', 'Lavage Standard': 'Lavage',
+  'Lavage Professionnel': 'Lavage', 'Lavage Complet': 'Lavage', 'Lavage Premium': 'Lavage',
+  'Autre Lavage': 'Lavage',
+  // Detailing
+  'Polissage': 'Detailing', 'Lustrage': 'Detailing', 'Protection Nano-céramique': 'Detailing',
+  'Film solaire & anti-UV': 'Detailing', 'Habillage / Covering': 'Detailing',
+  // Entretien rapide
+  'Changement pneus': 'Entretien', 'Réparation pneus': 'Entretien', 'Équilibrage': 'Entretien',
+  'Parallélisme': 'Entretien', 'Vidange': 'Entretien', 'Filtre à air': 'Entretien',
+  'Filtre à huile': 'Entretien', 'Filtre à gazoil': 'Entretien',
+  'Entretien climatisation': 'Entretien', 'Freins': 'Entretien',
+  'Reprogrammation calculateur': 'Entretien',
+};
+const serviceCategory = (type) => SERVICE_CATEGORY[type] || 'Autre';
 
 function getDashPeriodType() {
   // Pour le groupement du graphique CA vs Dépenses
@@ -307,10 +325,57 @@ function renderDashboard() {
 
   renderChartCA(entrees, sorties, period);
   renderChartTypes(entrees);
+  renderChartServiceCat(entrees);
   renderChartCategories(sorties);
   renderChartVehicules(entrees);
   renderChartHeures(entrees);
   renderRecentTable();
+}
+
+function renderChartServiceCat(entrees) {
+  const ctx = document.getElementById('chartServiceCat').getContext('2d');
+  if (chartServiceCat) chartServiceCat.destroy();
+
+  const cats = { 'Lavage': 0, 'Detailing': 0, 'Entretien': 0, 'Autre': 0 };
+  const ca   = { 'Lavage': 0, 'Detailing': 0, 'Entretien': 0, 'Autre': 0 };
+  entrees.forEach(e => {
+    const c = serviceCategory(e.type);
+    cats[c] = (cats[c] || 0) + 1;
+    ca[c]   = (ca[c]   || 0) + Number(e.montant || 0);
+  });
+  // On retire les catégories à zéro pour ne pas polluer
+  const labels = Object.keys(cats).filter(k => cats[k] > 0);
+  if (labels.length === 0) return;
+
+  const colors = { 'Lavage': '#1a73e8', 'Detailing': '#8b5cf6', 'Entretien': '#f59e0b', 'Autre': '#94a3b8' };
+  chartServiceCat = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Nombre',
+          data: labels.map(k => cats[k]),
+          backgroundColor: labels.map(k => colors[k]),
+          yAxisID: 'y',
+        },
+        {
+          label: 'CA (FCFA)',
+          data: labels.map(k => ca[k]),
+          backgroundColor: labels.map(k => colors[k] + '66'),
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+      scales: {
+        y:  { beginAtZero: true, position: 'left',  title: { display: true, text: 'Nombre' } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'CA' } },
+      },
+    },
+  });
 }
 
 function periodKey(dateStr, heure, period) {
