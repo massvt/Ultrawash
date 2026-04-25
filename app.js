@@ -429,13 +429,24 @@ function renderChartTypes(entrees) {
   entrees.forEach(e => { types[e.type] = (types[e.type] || 0) + 1; });
   if (Object.keys(types).length === 0) return;
 
+  // Top 5 + regroupement "Autres"
+  const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]);
+  const top    = sorted.slice(0, 5);
+  const rest   = sorted.slice(5);
+  const labels = top.map(([k]) => k);
+  const data   = top.map(([, v]) => v);
+  if (rest.length > 0) {
+    labels.push('Autres (' + rest.length + ')');
+    data.push(rest.reduce((a, [, v]) => a + v, 0));
+  }
+
   chartTypes = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: Object.keys(types),
+      labels,
       datasets: [{
-        data: Object.values(types),
-        backgroundColor: ['#1a73e8','#0d9e6e','#f59e0b','#e53935','#8b5cf6'],
+        data,
+        backgroundColor: ['#1a73e8','#0d9e6e','#f59e0b','#e53935','#8b5cf6','#94a3b8'],
         borderWidth: 2,
       }]
     },
