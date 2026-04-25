@@ -179,17 +179,26 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 /* ===== KPI GRID ===== */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* 6 KPIs alignés : 6 colonnes en très large, 3 en moyen, 2 en mobile */
+  grid-template-columns: repeat(6, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
+@media (max-width: 1300px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 800px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 
 .kpi-card {
   background: var(--white);
   border-radius: var(--radius);
-  padding: 20px 22px;
+  padding: 18px 20px;
   box-shadow: var(--shadow);
   border-left: 4px solid transparent;
+  /* Toutes les cartes ont la même hauteur, les labels alignés en haut,
+     valeurs centrées, sous-textes en bas */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 110px;
 }
 
 .kpi-card.ca      { border-color: var(--blue); }
@@ -199,16 +208,26 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .kpi-card.panier   { border-color: #8b5cf6; }
 .kpi-card.bestday  { border-color: #14b8a6; }
 
-.kpi-label { font-size: 0.8rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
-.kpi-value { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
-.kpi-sub   { font-size: 0.82rem; color: var(--gray-400); }
+.kpi-label {
+  font-size: 0.78rem;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  /* hauteur fixe pour aligner même quand un label fait 2 lignes */
+  min-height: 2.4em;
+  line-height: 1.2;
+  display: flex;
+  align-items: flex-start;
+}
+.kpi-value { font-size: 1.45rem; font-weight: 700; line-height: 1.1; margin: 4px 0; }
+.kpi-sub   { font-size: 0.8rem; color: var(--gray-400); }
 
 .kpi-card.ca .kpi-value       { color: var(--blue); }
 .kpi-card.depenses .kpi-value  { color: var(--red); }
 .kpi-card.benefice .kpi-value  { color: var(--green); }
 .kpi-card.lavages .kpi-value   { color: var(--orange); }
 .kpi-card.panier .kpi-value    { color: #8b5cf6; }
-.kpi-card.bestday .kpi-value   { color: #14b8a6; font-size: 1.2rem; }
+.kpi-card.bestday .kpi-value   { color: #14b8a6; font-size: 1.15rem; }
 
 /* ===== CHARTS ===== */
 .charts-row {
