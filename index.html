@@ -301,6 +301,7 @@
       <header class="page-header">
         <h1>Clients</h1>
         <div class="header-actions">
+          <button class="btn-outline" id="btnExportClients">Exporter CSV</button>
           <button class="btn-primary" id="btnNewClient">+ Nouveau client</button>
         </div>
       </header>
@@ -317,6 +318,18 @@
             <option value="particulier">Particuliers</option>
             <option value="entreprise">Entreprises / Flottes</option>
           </select>
+        </div>
+        <div class="filter-group">
+          <label>Dernière visite du</label>
+          <input type="date" id="c-from" />
+        </div>
+        <div class="filter-group">
+          <label>au</label>
+          <input type="date" id="c-to" />
+        </div>
+        <div class="filter-group filter-reset">
+          <label>&nbsp;</label>
+          <button type="button" class="btn-outline" id="c-reset">Réinitialiser</button>
         </div>
       </div>
 
@@ -369,6 +382,18 @@
         <div class="filter-group" style="flex:1;min-width:180px">
           <label>Recherche</label>
           <input type="text" id="r-search" placeholder="Nom, téléphone, plaque…" />
+        </div>
+        <div class="filter-group">
+          <label>Du</label>
+          <input type="date" id="r-from" />
+        </div>
+        <div class="filter-group">
+          <label>au</label>
+          <input type="date" id="r-to" />
+        </div>
+        <div class="filter-group filter-reset">
+          <label>&nbsp;</label>
+          <button type="button" class="btn-outline" id="r-reset">Réinitialiser</button>
         </div>
       </div>
 

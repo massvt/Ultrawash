@@ -986,20 +986,33 @@ function clientStats(clientId) {
   return { nb: lavages.length, ca, last };
 }
 
-function renderClientsList() {
+function getFilteredClients() {
   const q = (document.getElementById('c-search').value || '').toLowerCase().trim();
   const typeFilter = document.getElementById('c-filter-type').value;
-  const tbody = document.getElementById('clientsList');
-  const empty = document.getElementById('clientsEmpty');
+  const from = document.getElementById('c-from').value;
+  const to   = document.getElementById('c-to').value;
 
-  const list = cache.clients.filter(c => {
+  return cache.clients.filter(c => {
     if (typeFilter && c.type !== typeFilter) return false;
+    // Filtre dernière visite
+    if (from || to) {
+      const last = clientStats(c.id).last;
+      if (!last) return false; // jamais venu → exclu si filtre actif
+      if (from && last < from) return false;
+      if (to   && last > to)   return false;
+    }
     if (!q) return true;
     if (c.nom.toLowerCase().includes(q)) return true;
     if (c.telephone && c.telephone.toLowerCase().includes(q)) return true;
     const vehs = cache.vehicules.filter(v => v.client_id === c.id);
     return vehs.some(v => v.plaque.toLowerCase().includes(q));
   });
+}
+
+function renderClientsList() {
+  const tbody = document.getElementById('clientsList');
+  const empty = document.getElementById('clientsEmpty');
+  const list = getFilteredClients();
 
   if (list.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
   empty.style.display = 'none';
@@ -1038,7 +1051,52 @@ function escapeHtml(s) {
 
 document.getElementById('c-search').addEventListener('input', renderClientsList);
 document.getElementById('c-filter-type').addEventListener('change', renderClientsList);
+document.getElementById('c-from').addEventListener('change', renderClientsList);
+document.getElementById('c-to').addEventListener('change', renderClientsList);
+document.getElementById('c-reset').addEventListener('click', () => {
+  document.getElementById('c-search').value = '';
+  document.getElementById('c-filter-type').value = '';
+  document.getElementById('c-from').value = '';
+  document.getElementById('c-to').value = '';
+  renderClientsList();
+});
 document.getElementById('btnNewClient').addEventListener('click', () => openClientModal(null));
+
+// Export CSV des clients (respecte les filtres en cours)
+document.getElementById('btnExportClients').addEventListener('click', () => {
+  const list = getFilteredClients();
+  if (list.length === 0) { toast('Aucun client à exporter', '#f59e0b'); return; }
+  const escCsv = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n;]/.test(s) ? `"${s}"` : s;
+  };
+  const header = 'Nom,Type,Telephone,Email,Adresse,Plaques,Nb lavages,CA total (FCFA),Derniere visite,Notes\n';
+  const rows = list.map(c => {
+    const st = clientStats(c.id);
+    const plaques = cache.vehicules.filter(v => v.client_id === c.id).map(v => v.plaque).join(' | ');
+    return [
+      escCsv(c.nom),
+      c.type,
+      escCsv(c.telephone),
+      escCsv(c.email),
+      escCsv(c.adresse),
+      escCsv(plaques),
+      st.nb,
+      st.ca,
+      st.last || '',
+      escCsv(c.notes),
+    ].join(',');
+  }).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ultrawash_clients_${todayYmd()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Export clients téléchargé');
+});
 
 // ----- Modal client (create/edit) -----
 function openClientModal(clientId, prefill = {}) {
@@ -1303,6 +1361,8 @@ function renderReservationsList() {
   const period  = document.getElementById('r-period').value;
   const statut  = document.getElementById('r-statut').value;
   const q       = (document.getElementById('r-search').value || '').toLowerCase().trim();
+  const from    = document.getElementById('r-from').value;
+  const to      = document.getElementById('r-to').value;
   const tbody   = document.getElementById('resaList');
   const empty   = document.getElementById('resaEmpty');
 
@@ -1311,7 +1371,11 @@ function renderReservationsList() {
   const weekAhead = new Date(); weekAhead.setDate(weekAhead.getDate() + 7);
 
   let list = cache.reservations.slice();
-  if (period === 'today') list = list.filter(r => r.date_prevue === today);
+  // Filtre date "Du / au" prend priorité s'il est renseigné
+  if (from || to) {
+    if (from) list = list.filter(r => r.date_prevue >= from);
+    if (to)   list = list.filter(r => r.date_prevue <= to);
+  } else if (period === 'today') list = list.filter(r => r.date_prevue === today);
   else if (period === 'week') list = list.filter(r => r.date_prevue >= ymd(weekAgo) && r.date_prevue <= ymd(weekAhead));
   else if (period === 'upcoming') list = list.filter(r => r.date_prevue >= today && r.statut === 'prevu');
   if (statut) list = list.filter(r => r.statut === statut);
@@ -1355,6 +1419,16 @@ function renderReservationsList() {
 document.getElementById('r-period').addEventListener('change', renderReservationsList);
 document.getElementById('r-statut').addEventListener('change', renderReservationsList);
 document.getElementById('r-search').addEventListener('input', renderReservationsList);
+document.getElementById('r-from').addEventListener('change', renderReservationsList);
+document.getElementById('r-to').addEventListener('change', renderReservationsList);
+document.getElementById('r-reset').addEventListener('click', () => {
+  document.getElementById('r-period').value = 'week';
+  document.getElementById('r-statut').value = '';
+  document.getElementById('r-search').value = '';
+  document.getElementById('r-from').value = '';
+  document.getElementById('r-to').value = '';
+  renderReservationsList();
+});
 document.getElementById('btnNewResa').addEventListener('click', () => openResaModal(null));
 
 async function onResaAction(action, id) {
