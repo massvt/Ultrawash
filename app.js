@@ -111,7 +111,23 @@ const DB = {
 
   async addVehicule(row) {
     const { data, error } = await sb.from('vehicules').insert(row).select().single();
-    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (error) {
+      if (error.code === '23505') {
+        // plaque déjà prise — on essaie d'identifier le client propriétaire
+        const { data: existing } = await sb
+          .from('vehicules')
+          .select('clients(nom)')
+          .eq('plaque', row.plaque)
+          .maybeSingle();
+        const owner = existing?.clients?.nom;
+        toast(owner
+          ? `Plaque ${row.plaque} déjà rattachée à : ${owner}`
+          : `Plaque ${row.plaque} déjà enregistrée`, '#e53935');
+      } else {
+        toast('Erreur : ' + error.message, '#e53935');
+      }
+      return null;
+    }
     cache.vehicules.push(data);
     return data;
   },
@@ -1006,12 +1022,17 @@ function openClientModal(clientId, prefill = {}) {
     document.getElementById('cl-email').value     = c.email || '';
     document.getElementById('cl-adresse').value   = c.adresse || '';
     document.getElementById('cl-notes').value     = c.notes || '';
-  } else if (prefill.plaque) {
-    // pré-remplir un véhicule à la volée
-    editingClientNewVehicules.push({ plaque: prefill.plaque.toUpperCase(), marque: '', modele: '' });
   }
+  // Pré-remplir le champ d'ajout véhicule (sans pousser dans la liste)
+  document.getElementById('cl-veh-plaque').value = prefill.plaque ? prefill.plaque.toUpperCase() : '';
+  document.getElementById('cl-veh-marque').value = '';
+  document.getElementById('cl-veh-modele').value = '';
   renderVehiculesInModal();
   clientModal.classList.add('show');
+  // Focus sur marque si plaque pré-remplie pour saisie immédiate
+  if (prefill.plaque) {
+    setTimeout(() => document.getElementById('cl-veh-marque').focus(), 50);
+  }
 }
 
 function closeClientModal() {
@@ -1063,8 +1084,20 @@ document.getElementById('cl-veh-add').addEventListener('click', async () => {
   const marque = document.getElementById('cl-veh-marque').value.trim();
   const modele = document.getElementById('cl-veh-modele').value.trim();
   if (!plaque) { toast('Plaque requise', '#e53935'); return; }
+
+  // Vérif côté client : la plaque est-elle déjà chez un autre client ?
+  const owned = cache.vehicules.find(v => v.plaque === plaque && v.client_id !== editingClientId);
+  if (owned) {
+    const ownerClient = cache.clients.find(c => c.id === owned.client_id);
+    toast(`Plaque déjà rattachée à : ${ownerClient ? ownerClient.nom : 'un autre client'}`, '#e53935');
+    return;
+  }
+  if (editingClientNewVehicules.some(v => v.plaque === plaque)) {
+    toast('Plaque déjà ajoutée', '#e53935');
+    return;
+  }
+
   if (editingClientId) {
-    // ajout direct
     const saved = await DB.addVehicule({ client_id: editingClientId, plaque, marque: marque || null, modele: modele || null });
     if (saved) {
       document.getElementById('cl-veh-plaque').value = '';
@@ -1073,8 +1106,6 @@ document.getElementById('cl-veh-add').addEventListener('click', async () => {
       renderVehiculesInModal();
     }
   } else {
-    // bufferiser
-    if (editingClientNewVehicules.some(v => v.plaque === plaque)) { toast('Plaque déjà ajoutée', '#e53935'); return; }
     editingClientNewVehicules.push({ plaque, marque, modele });
     document.getElementById('cl-veh-plaque').value = '';
     document.getElementById('cl-veh-marque').value = '';
@@ -1085,6 +1116,13 @@ document.getElementById('cl-veh-add').addEventListener('click', async () => {
 
 document.getElementById('formClient').addEventListener('submit', async (ev) => {
   ev.preventDefault();
+  // Si une plaque est saisie mais pas encore ajoutée, on l'ajoute automatiquement
+  const pendingPlaque = (document.getElementById('cl-veh-plaque').value || '').trim().toUpperCase();
+  if (pendingPlaque) {
+    document.getElementById('cl-veh-add').click();
+    // Si l'ajout a échoué (plaque dupliquée), on stoppe le submit
+    if ((document.getElementById('cl-veh-plaque').value || '').trim()) return;
+  }
   const row = {
     type:      document.getElementById('cl-type').value,
     nom:       document.getElementById('cl-nom').value.trim(),
