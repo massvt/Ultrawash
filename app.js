@@ -8,21 +8,54 @@ const session = { user: null, role: null };
 const isPatron = () => session.role === 'patron';
 
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
-const cache = { entrees: [], sorties: [], clients: [], vehicules: [], clientsLoaded: false };
+const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], clientsLoaded: false };
 
 const DB = {
   getEntrees: () => cache.entrees,
   getSorties: () => cache.sorties,
 
   async loadAll() {
-    const [{ data: e, error: ee }, { data: s, error: se }] = await Promise.all([
+    const [
+      { data: e,  error: ee },
+      { data: s,  error: se },
+      { data: r,  error: re },
+    ] = await Promise.all([
       sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false }),
       sb.from('sorties').select('*').order('date', { ascending: false }),
+      sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true }),
     ]);
     if (ee) console.error('entrees:', ee);
     if (se) console.error('sorties:', se);
-    cache.entrees = e || [];
-    cache.sorties = s || [];
+    if (re) console.error('reservations:', re);
+    cache.entrees      = e || [];
+    cache.sorties      = s || [];
+    cache.reservations = r || [];
+  },
+
+  getReservations: () => cache.reservations,
+
+  async addReservation(row) {
+    const { data, error } = await sb.from('reservations').insert(row).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.reservations.push(data);
+    cache.reservations.sort(resaSort);
+    return data;
+  },
+
+  async updateReservation(id, row) {
+    const { data, error } = await sb.from('reservations').update(row).eq('id', id).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.reservations.findIndex(r => r.id === id);
+    if (i !== -1) cache.reservations[i] = data;
+    cache.reservations.sort(resaSort);
+    return data;
+  },
+
+  async delReservation(id) {
+    const { error } = await sb.from('reservations').delete().eq('id', id);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.reservations = cache.reservations.filter(r => r.id !== id);
+    return true;
   },
 
   async addEntree(row) {
@@ -164,10 +197,11 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('page-' + btn.dataset.page).classList.add('active');
-    if (btn.dataset.page === 'dashboard') renderDashboard();
+    if (btn.dataset.page === 'dashboard') { renderDashboard(); refreshDashResaToday(); }
     if (btn.dataset.page === 'entrees') renderEntreesList();
     if (btn.dataset.page === 'sorties') renderSortiesList();
     if (btn.dataset.page === 'clients') renderClientsPage();
+    if (btn.dataset.page === 'reservations') renderReservationsPage();
     if (btn.dataset.page === 'historique') renderHistorique();
     closeSidebar();
   });
@@ -890,6 +924,8 @@ async function startApp() {
     goToPage('entrees');
     renderEntreesList();
   }
+  updateResaBadge();
+  refreshDashResaToday();
 }
 
 formLogin.addEventListener('submit', async (ev) => {
@@ -1209,3 +1245,372 @@ document.getElementById('ficheDelete').addEventListener('click', async () => {
   renderClientsList();
   toast('Client supprimé', '#e53935');
 });
+
+// ===== RESERVATIONS =====
+function resaSort(a, b) {
+  if (a.date_prevue !== b.date_prevue) return a.date_prevue < b.date_prevue ? -1 : 1;
+  return (a.heure_prevue || '').localeCompare(b.heure_prevue || '');
+}
+
+const resaModal = document.getElementById('resaModal');
+let editingResaId = null;
+let resaMode = 'existing'; // 'existing' | 'passage'
+
+function todayYmd() { return ymd(new Date()); }
+
+function statutLabel(s) {
+  return ({ prevu: 'Prévu', arrive: 'Arrivé', annule: 'Annulé' })[s] || s;
+}
+
+function updateResaBadge() {
+  const today = todayYmd();
+  const n = cache.reservations.filter(r => r.date_prevue === today && r.statut === 'prevu').length;
+  const badge = document.getElementById('navBadgeResa');
+  if (!badge) return;
+  if (n > 0) { badge.textContent = n; badge.style.display = ''; }
+  else { badge.textContent = ''; badge.style.display = 'none'; }
+}
+
+function clientLabel(r) {
+  if (r.client_id) {
+    const c = cache.clients.find(x => x.id === r.client_id);
+    if (c) return c.nom + (c.telephone ? ' · ' + c.telephone : '');
+  }
+  return (r.client_nom || 'Client de passage') + (r.client_telephone ? ' · ' + r.client_telephone : '');
+}
+
+function vehiculeLabel(r) {
+  let label = r.vehicule_type || '';
+  if (r.vehicule_id) {
+    const v = cache.vehicules.find(x => x.id === r.vehicule_id);
+    if (v) {
+      const desc = [v.marque, v.modele].filter(Boolean).join(' ');
+      label = (desc ? desc + ' · ' : '') + v.plaque;
+    }
+  } else if (r.plaque) {
+    label = (label ? label + ' · ' : '') + r.plaque;
+  }
+  return label || '—';
+}
+
+async function renderReservationsPage() {
+  // Pour la recherche client dans la modale, on lazy-load les clients aussi
+  if (!cache.clientsLoaded) await DB.loadClients();
+  renderReservationsList();
+}
+
+function renderReservationsList() {
+  const period  = document.getElementById('r-period').value;
+  const statut  = document.getElementById('r-statut').value;
+  const q       = (document.getElementById('r-search').value || '').toLowerCase().trim();
+  const tbody   = document.getElementById('resaList');
+  const empty   = document.getElementById('resaEmpty');
+
+  const today = todayYmd();
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAhead = new Date(); weekAhead.setDate(weekAhead.getDate() + 7);
+
+  let list = cache.reservations.slice();
+  if (period === 'today') list = list.filter(r => r.date_prevue === today);
+  else if (period === 'week') list = list.filter(r => r.date_prevue >= ymd(weekAgo) && r.date_prevue <= ymd(weekAhead));
+  else if (period === 'upcoming') list = list.filter(r => r.date_prevue >= today && r.statut === 'prevu');
+  if (statut) list = list.filter(r => r.statut === statut);
+  if (q) {
+    list = list.filter(r => {
+      const cl = clientLabel(r).toLowerCase();
+      const veh = vehiculeLabel(r).toLowerCase();
+      return cl.includes(q) || veh.includes(q);
+    });
+  }
+
+  if (list.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = list.map(r => {
+    const canDelete = isPatron();
+    const heure = (r.heure_prevue || '').slice(0,5);
+    return `
+      <tr>
+        <td>${fmtDate(r.date_prevue)}</td>
+        <td>${heure}</td>
+        <td>${escapeHtml(clientLabel(r))}</td>
+        <td>${escapeHtml(vehiculeLabel(r))}</td>
+        <td>${escapeHtml(r.type_lavage || '—')}</td>
+        <td>${r.montant_estime ? fmt(r.montant_estime) : '—'}</td>
+        <td><span class="statut-pill statut-${r.statut}">${statutLabel(r.statut)}</span></td>
+        <td class="resa-actions">
+          ${r.statut === 'prevu' ? `<button class="btn-mini btn-ok" data-act="arrive" data-id="${r.id}" title="Marquer arrivé">✓ Arrivé</button>` : ''}
+          ${r.statut === 'prevu' ? `<button class="btn-mini btn-edit" data-act="edit" data-id="${r.id}" title="Modifier">✎</button>` : ''}
+          ${r.statut === 'prevu' ? `<button class="btn-mini btn-cancel" data-act="annuler" data-id="${r.id}" title="Annuler">⊘</button>` : ''}
+          ${canDelete ? `<button class="btn-mini btn-del" data-act="del" data-id="${r.id}" title="Supprimer">✕</button>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('button[data-act]').forEach(b => {
+    b.addEventListener('click', () => onResaAction(b.dataset.act, b.dataset.id));
+  });
+}
+
+document.getElementById('r-period').addEventListener('change', renderReservationsList);
+document.getElementById('r-statut').addEventListener('change', renderReservationsList);
+document.getElementById('r-search').addEventListener('input', renderReservationsList);
+document.getElementById('btnNewResa').addEventListener('click', () => openResaModal(null));
+
+async function onResaAction(action, id) {
+  const r = cache.reservations.find(x => x.id === id);
+  if (!r) return;
+  if (action === 'edit') return openResaModal(id);
+  if (action === 'annuler') {
+    if (!confirm('Annuler cette réservation ?')) return;
+    const ok = await DB.updateReservation(id, { statut: 'annule' });
+    if (ok) { renderReservationsList(); updateResaBadge(); refreshDashResaToday(); toast('Réservation annulée', '#f59e0b'); }
+    return;
+  }
+  if (action === 'del') {
+    if (!confirm('Supprimer définitivement cette réservation ?')) return;
+    const ok = await DB.delReservation(id);
+    if (ok) { renderReservationsList(); updateResaBadge(); refreshDashResaToday(); toast('Réservation supprimée', '#e53935'); }
+    return;
+  }
+  if (action === 'arrive') {
+    await convertResaToEntree(r);
+  }
+}
+
+async function convertResaToEntree(r) {
+  // Construit la ligne entree à partir de la résa
+  const now = new Date();
+  const row = {
+    date: r.date_prevue,
+    heure: (r.heure_prevue || now.toTimeString().slice(0,5)).slice(0,5),
+    vehicule: r.vehicule_type || 'Voiture',
+    type: r.type_lavage || 'Lavage simple',
+    montant: Number(r.montant_estime || 0),
+    plaque: r.plaque || null,
+    notes: r.notes || null,
+    client_id: r.client_id || null,
+    vehicule_id: r.vehicule_id || null,
+  };
+  // Si plaque mais pas de vehicule_id → tenter résolution
+  if (row.plaque && !row.vehicule_id) {
+    const { data } = await sb.from('vehicules').select('id, client_id').eq('plaque', row.plaque).maybeSingle();
+    if (data) { row.vehicule_id = data.id; if (!row.client_id) row.client_id = data.client_id; }
+  }
+  // Demander confirmation du montant si pas estimé
+  if (!row.montant) {
+    const v = prompt('Montant facturé (FCFA) ?', '');
+    if (v === null) return;
+    row.montant = Number(v) || 0;
+  }
+  const saved = await DB.addEntree(row);
+  if (!saved) return;
+  await DB.updateReservation(r.id, { statut: 'arrive', entree_id: saved.id });
+  renderReservationsList();
+  updateResaBadge();
+  refreshDashResaToday();
+  toast('Client arrivé — lavage enregistré');
+}
+
+// ----- Modal réservation -----
+function openResaModal(id) {
+  editingResaId = id;
+  document.getElementById('resaModalTitle').textContent = id ? 'Modifier la réservation' : 'Nouvelle réservation';
+  const f = document.getElementById('formResa');
+  f.reset();
+  document.getElementById('r-id').value = id || '';
+  document.getElementById('r-client-id').value = '';
+  document.getElementById('r-vehicule-id').value = '';
+  document.getElementById('r-client-suggest').innerHTML = '';
+  document.getElementById('r-client-selected').innerHTML = '';
+  setResaMode('existing');
+
+  if (id) {
+    const r = cache.reservations.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('r-date').value    = r.date_prevue;
+    document.getElementById('r-heure').value   = (r.heure_prevue || '').slice(0,5);
+    document.getElementById('r-type').value    = r.type_lavage || 'Lavage simple';
+    document.getElementById('r-montant').value = r.montant_estime || '';
+    document.getElementById('r-notes').value   = r.notes || '';
+    if (r.client_id) {
+      setResaMode('existing');
+      const c = cache.clients.find(x => x.id === r.client_id);
+      document.getElementById('r-client-id').value = r.client_id;
+      document.getElementById('r-vehicule-id').value = r.vehicule_id || '';
+      if (c) showSelectedClient(c, r.vehicule_id);
+    } else {
+      setResaMode('passage');
+      document.getElementById('r-client-nom').value       = r.client_nom || '';
+      document.getElementById('r-client-telephone').value = r.client_telephone || '';
+      document.getElementById('r-plaque').value           = r.plaque || '';
+      document.getElementById('r-vehicule-type').value    = r.vehicule_type || 'Voiture';
+    }
+  } else {
+    // Defaults : aujourd'hui, heure prochaine
+    const now = new Date();
+    document.getElementById('r-date').value  = now.toISOString().slice(0,10);
+    document.getElementById('r-heure').value = now.toTimeString().slice(0,5);
+  }
+  resaModal.classList.add('show');
+}
+
+function closeResaModal() {
+  resaModal.classList.remove('show');
+  editingResaId = null;
+}
+document.getElementById('resaClose').addEventListener('click', closeResaModal);
+resaModal.querySelector('[data-modal-cancel]').addEventListener('click', closeResaModal);
+resaModal.addEventListener('click', (e) => { if (e.target === resaModal) closeResaModal(); });
+
+function setResaMode(mode) {
+  resaMode = mode;
+  document.getElementById('resa-mode-existing').style.display = mode === 'existing' ? '' : 'none';
+  document.getElementById('resa-mode-passage').style.display  = mode === 'passage'  ? '' : 'none';
+  document.querySelectorAll('.resa-client-toggle .btn-toggle').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+}
+document.querySelectorAll('.resa-client-toggle .btn-toggle').forEach(b => {
+  b.addEventListener('click', () => setResaMode(b.dataset.mode));
+});
+
+// Recherche client (debounced) sur cache local
+let resaSearchTimer = null;
+document.getElementById('r-client-search').addEventListener('input', (ev) => {
+  clearTimeout(resaSearchTimer);
+  const q = ev.target.value.trim().toLowerCase();
+  document.getElementById('r-client-id').value = '';
+  document.getElementById('r-vehicule-id').value = '';
+  document.getElementById('r-client-selected').innerHTML = '';
+  const sug = document.getElementById('r-client-suggest');
+  if (q.length < 2) { sug.innerHTML = ''; return; }
+  resaSearchTimer = setTimeout(() => {
+    const matches = [];
+    cache.clients.forEach(c => {
+      const vehs = cache.vehicules.filter(v => v.client_id === c.id);
+      const hitNom = c.nom.toLowerCase().includes(q) || (c.telephone || '').toLowerCase().includes(q);
+      const hitVeh = vehs.find(v => v.plaque.toLowerCase().includes(q));
+      if (hitNom || hitVeh) matches.push({ client: c, vehicule: hitVeh || vehs[0] || null });
+    });
+    if (matches.length === 0) {
+      sug.innerHTML = '<div class="resa-suggest-empty">Aucun client trouvé. Bascule sur "Client de passage".</div>';
+      return;
+    }
+    sug.innerHTML = matches.slice(0, 8).map((m, i) => `
+      <div class="resa-suggest-item" data-i="${i}">
+        <b>${escapeHtml(m.client.nom)}</b>
+        ${m.client.telephone ? '· ' + escapeHtml(m.client.telephone) : ''}
+        ${m.vehicule ? '· ' + escapeHtml(m.vehicule.plaque) : ''}
+      </div>`).join('');
+    sug.querySelectorAll('.resa-suggest-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const m = matches[Number(el.dataset.i)];
+        document.getElementById('r-client-id').value = m.client.id;
+        document.getElementById('r-vehicule-id').value = m.vehicule ? m.vehicule.id : '';
+        document.getElementById('r-client-search').value = '';
+        sug.innerHTML = '';
+        showSelectedClient(m.client, m.vehicule ? m.vehicule.id : null);
+      });
+    });
+  }, 200);
+});
+
+function showSelectedClient(client, vehiculeId) {
+  const vehs = cache.vehicules.filter(v => v.client_id === client.id);
+  const sel = document.getElementById('r-client-selected');
+  const vehOpts = vehs.length
+    ? `<label>Véhicule :
+        <select id="r-veh-pick">
+          <option value="">— sans véhicule —</option>
+          ${vehs.map(v => `<option value="${v.id}" ${v.id === vehiculeId ? 'selected' : ''}>${escapeHtml(v.plaque)}${v.marque || v.modele ? ' · ' + escapeHtml([v.marque, v.modele].filter(Boolean).join(' ')) : ''}</option>`).join('')}
+        </select></label>`
+    : '<em>Pas de véhicule enregistré pour ce client.</em>';
+  sel.innerHTML = `
+    <div class="resa-selected-card">
+      <b>✓ ${escapeHtml(client.nom)}</b>
+      ${client.telephone ? '<span>· ' + escapeHtml(client.telephone) + '</span>' : ''}
+      <button type="button" class="btn-mini" id="r-clear-client">Changer</button>
+      <div class="resa-veh-pick">${vehOpts}</div>
+    </div>`;
+  document.getElementById('r-clear-client').addEventListener('click', () => {
+    document.getElementById('r-client-id').value = '';
+    document.getElementById('r-vehicule-id').value = '';
+    sel.innerHTML = '';
+  });
+  const pick = document.getElementById('r-veh-pick');
+  if (pick) pick.addEventListener('change', () => {
+    document.getElementById('r-vehicule-id').value = pick.value;
+  });
+}
+
+document.getElementById('formResa').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const row = {
+    date_prevue:  document.getElementById('r-date').value,
+    heure_prevue: document.getElementById('r-heure').value,
+    type_lavage:  document.getElementById('r-type').value,
+    montant_estime: Number(document.getElementById('r-montant').value) || null,
+    notes:        document.getElementById('r-notes').value.trim() || null,
+  };
+
+  if (resaMode === 'existing') {
+    const cid = document.getElementById('r-client-id').value;
+    if (!cid) { toast('Sélectionne un client (ou bascule sur "Client de passage")', '#e53935'); return; }
+    row.client_id   = cid;
+    row.vehicule_id = document.getElementById('r-vehicule-id').value || null;
+    // Reset des champs passage
+    row.client_nom = null; row.client_telephone = null; row.plaque = null; row.vehicule_type = null;
+  } else {
+    const nom = document.getElementById('r-client-nom').value.trim();
+    if (!nom) { toast('Nom du client requis', '#e53935'); return; }
+    row.client_id   = null;
+    row.vehicule_id = null;
+    row.client_nom        = nom;
+    row.client_telephone  = document.getElementById('r-client-telephone').value.trim() || null;
+    row.plaque            = (document.getElementById('r-plaque').value || '').trim().toUpperCase() || null;
+    row.vehicule_type     = document.getElementById('r-vehicule-type').value;
+  }
+
+  let saved;
+  if (editingResaId) saved = await DB.updateReservation(editingResaId, row);
+  else {
+    row.created_by = session.user.id;
+    saved = await DB.addReservation(row);
+  }
+  if (!saved) return;
+  closeResaModal();
+  renderReservationsList();
+  updateResaBadge();
+  refreshDashResaToday();
+  toast(editingResaId ? 'Réservation mise à jour' : 'Réservation enregistrée');
+});
+
+// ----- Widget dashboard : RDV du jour -----
+function refreshDashResaToday() {
+  const tbody = document.getElementById('dashResaToday');
+  const empty = document.getElementById('dashResaEmpty');
+  if (!tbody) return;
+  const today = todayYmd();
+  const list = cache.reservations
+    .filter(r => r.date_prevue === today && r.statut !== 'annule')
+    .sort((a, b) => (a.heure_prevue || '').localeCompare(b.heure_prevue || ''));
+  if (list.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = list.map(r => `
+    <tr>
+      <td>${(r.heure_prevue || '').slice(0,5)}</td>
+      <td>${escapeHtml(clientLabel(r))}</td>
+      <td>${escapeHtml(vehiculeLabel(r))}</td>
+      <td>${escapeHtml(r.type_lavage || '—')}</td>
+      <td><span class="statut-pill statut-${r.statut}">${statutLabel(r.statut)}</span></td>
+      <td>${r.statut === 'prevu' ? `<button class="btn-mini btn-ok" data-dash-arrive="${r.id}">✓ Arrivé</button>` : ''}</td>
+    </tr>`).join('');
+  tbody.querySelectorAll('[data-dash-arrive]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const r = cache.reservations.find(x => x.id === b.dataset.dashArrive);
+      if (r) await convertResaToEntree(r);
+    });
+  });
+}
+

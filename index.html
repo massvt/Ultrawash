@@ -50,6 +50,10 @@
       <button class="nav-btn" data-page="clients">
         <span class="icon">👥</span> Clients
       </button>
+      <button class="nav-btn" data-page="reservations">
+        <span class="icon">📅</span> Réservations
+        <span class="nav-badge" id="navBadgeResa"></span>
+      </button>
       <button class="nav-btn" data-page="historique">
         <span class="icon">📋</span> Historique
       </button>
@@ -147,6 +151,17 @@
           <h3>Heures de pointe</h3>
           <canvas id="chartHeures"></canvas>
         </div>
+      </div>
+
+      <div class="recent-section">
+        <h3>Réservations du jour</h3>
+        <div class="table-wrap"><table class="table">
+          <thead>
+            <tr><th>Heure</th><th>Client</th><th>Véhicule</th><th>Service</th><th>Statut</th><th></th></tr>
+          </thead>
+          <tbody id="dashResaToday"></tbody>
+        </table></div>
+        <div id="dashResaEmpty" class="empty-state">Aucune réservation prévue aujourd'hui.</div>
       </div>
 
       <div class="recent-section">
@@ -321,6 +336,58 @@
         <tbody id="clientsList"></tbody>
       </table></div>
       <div id="clientsEmpty" class="empty-state">Aucun client trouvé.</div>
+    </section>
+
+    <!-- RESERVATIONS -->
+    <section id="page-reservations" class="page">
+      <header class="page-header">
+        <h1>Réservations</h1>
+        <div class="header-actions">
+          <button class="btn-primary" id="btnNewResa">+ Nouvelle réservation</button>
+        </div>
+      </header>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Période</label>
+          <select id="r-period">
+            <option value="today">Aujourd'hui</option>
+            <option value="week" selected>Cette semaine</option>
+            <option value="upcoming">À venir</option>
+            <option value="all">Tout</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Statut</label>
+          <select id="r-statut">
+            <option value="">Tous</option>
+            <option value="prevu">Prévus</option>
+            <option value="arrive">Arrivés</option>
+            <option value="annule">Annulés</option>
+          </select>
+        </div>
+        <div class="filter-group" style="flex:1;min-width:180px">
+          <label>Recherche</label>
+          <input type="text" id="r-search" placeholder="Nom, téléphone, plaque…" />
+        </div>
+      </div>
+
+      <div class="table-wrap"><table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Heure</th>
+            <th>Client</th>
+            <th>Véhicule / Plaque</th>
+            <th>Service</th>
+            <th>Montant est.</th>
+            <th>Statut</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="resaList"></tbody>
+      </table></div>
+      <div id="resaEmpty" class="empty-state">Aucune réservation.</div>
     </section>
 
     <!-- HISTORIQUE -->
@@ -581,6 +648,108 @@
           <button type="button" class="btn-danger patron-only" id="ficheDelete">Supprimer le client</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL RESERVATION -->
+  <div id="resaModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="resaModalTitle">Nouvelle réservation</h3>
+        <button type="button" class="modal-close" id="resaClose" aria-label="Fermer">✕</button>
+      </div>
+      <form id="formResa" class="modal-form active">
+        <input type="hidden" id="r-id" />
+
+        <!-- Mode client -->
+        <div class="form-group">
+          <label>Client</label>
+          <div class="resa-client-toggle">
+            <button type="button" class="btn-toggle active" data-mode="existing">Client enregistré</button>
+            <button type="button" class="btn-toggle" data-mode="passage">Client de passage</button>
+          </div>
+        </div>
+
+        <!-- Recherche client existant -->
+        <div id="resa-mode-existing">
+          <div class="form-group">
+            <label>Rechercher (nom ou plaque)</label>
+            <input type="text" id="r-client-search" placeholder="Tape un nom ou une plaque…" autocomplete="off" />
+            <input type="hidden" id="r-client-id" />
+            <input type="hidden" id="r-vehicule-id" />
+            <div id="r-client-suggest" class="resa-suggest"></div>
+            <div id="r-client-selected" class="resa-selected"></div>
+          </div>
+        </div>
+
+        <!-- Saisie client de passage -->
+        <div id="resa-mode-passage" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nom du client</label>
+              <input type="text" id="r-client-nom" />
+            </div>
+            <div class="form-group">
+              <label>Téléphone</label>
+              <input type="tel" id="r-client-telephone" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Plaque (optionnel)</label>
+              <input type="text" id="r-plaque" />
+            </div>
+            <div class="form-group">
+              <label>Type de véhicule</label>
+              <select id="r-vehicule-type">
+                <option value="Voiture">Voiture</option>
+                <option value="Moto">Moto</option>
+                <option value="SUV/4x4">SUV / 4x4</option>
+                <option value="Camionnette">Camionnette</option>
+                <option value="Bus/Camion">Bus / Camion</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="r-date" required />
+          </div>
+          <div class="form-group">
+            <label>Heure</label>
+            <input type="time" id="r-heure" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type de lavage</label>
+            <select id="r-type">
+              <option value="Lavage simple">Lavage simple</option>
+              <option value="Lavage complet">Lavage complet</option>
+              <option value="Lavage intérieur">Lavage intérieur</option>
+              <option value="Lavage premium">Lavage premium</option>
+              <option value="Polissage">Polissage</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Montant estimé (FCFA)</label>
+            <input type="number" id="r-montant" min="0" placeholder="ex: 2000" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" id="r-notes" placeholder="Remarques..." />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" data-modal-cancel>Annuler</button>
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </div>
+      </form>
     </div>
   </div>
 

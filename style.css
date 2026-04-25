@@ -727,3 +727,85 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 
 /* La modal-form (clients) doit être affichée par défaut quand .active */
 #formClient.active { display: block; }
+
+/* ===== RESERVATIONS ===== */
+.nav-badge {
+  display: inline-block;
+  margin-left: auto;
+  background: #ef4444;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  min-width: 22px;
+  text-align: center;
+}
+.statut-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+}
+.statut-prevu  { background: #dbeafe; color: #1e40af; }
+.statut-arrive { background: #dcfce7; color: #166534; }
+.statut-annule { background: #fee2e2; color: #991b1b; }
+
+.resa-actions { white-space: nowrap; display: flex; gap: 4px; flex-wrap: wrap; }
+.btn-mini {
+  padding: 4px 8px;
+  font-size: .8rem;
+  border: 1px solid var(--gray-100);
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.btn-mini:hover { background: var(--gray-50, #f9fafb); }
+.btn-mini.btn-ok { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.btn-mini.btn-ok:hover { background: #bbf7d0; }
+.btn-mini.btn-cancel { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.btn-mini.btn-edit { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.btn-mini.btn-del { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+
+.resa-client-toggle { display: flex; gap: 6px; }
+.btn-toggle {
+  padding: 6px 14px;
+  border: 1px solid var(--gray-100);
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .85rem;
+}
+.btn-toggle.active { background: #1e40af; color: #fff; border-color: #1e40af; }
+
+.resa-suggest {
+  margin-top: 6px;
+  border: 1px solid var(--gray-100);
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fff;
+}
+.resa-suggest:empty { display: none; }
+.resa-suggest-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--gray-100); font-size: .9rem; }
+.resa-suggest-item:last-child { border-bottom: none; }
+.resa-suggest-item:hover { background: #f0f9ff; }
+.resa-suggest-empty { padding: 10px 12px; color: var(--gray-400); font-style: italic; font-size: .85rem; }
+
+.resa-selected { margin-top: 8px; }
+.resa-selected-card {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: .9rem;
+}
+.resa-selected-card .btn-mini { margin-left: auto; }
+.resa-veh-pick { flex-basis: 100%; margin-top: 4px; }
+.resa-veh-pick label { display: flex; gap: 8px; align-items: center; font-size: .85rem; }
+.resa-veh-pick select { flex: 1; }
