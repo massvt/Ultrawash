@@ -1452,6 +1452,8 @@ function openResaModal(id) {
     document.getElementById('r-date').value  = now.toISOString().slice(0,10);
     document.getElementById('r-heure').value = now.toTimeString().slice(0,5);
   }
+  // Empêche la sélection d'une date passée dans le date-picker
+  document.getElementById('r-date').min = todayYmd();
   resaModal.classList.add('show');
 }
 
@@ -1554,6 +1556,24 @@ document.getElementById('formResa').addEventListener('submit', async (ev) => {
     notes:        document.getElementById('r-notes').value.trim() || null,
   };
 
+  // 1) Refuser une date dans le passé
+  if (row.date_prevue < todayYmd()) {
+    toast('Impossible de réserver à une date passée', '#e53935');
+    return;
+  }
+
+  // 2) Refuser un conflit de créneau (même date + même heure, statut prevu)
+  const conflict = cache.reservations.find(r =>
+    r.id !== editingResaId &&
+    r.statut === 'prevu' &&
+    r.date_prevue === row.date_prevue &&
+    (r.heure_prevue || '').slice(0,5) === row.heure_prevue
+  );
+  if (conflict) {
+    toast(`Conflit de créneau : déjà réservé à ${row.heure_prevue} pour ${clientLabel(conflict)}`, '#e53935');
+    return;
+  }
+
   if (resaMode === 'existing') {
     const cid = document.getElementById('r-client-id').value;
     if (!cid) { toast('Sélectionne un client (ou bascule sur "Client de passage")', '#e53935'); return; }
@@ -1564,11 +1584,39 @@ document.getElementById('formResa').addEventListener('submit', async (ev) => {
   } else {
     const nom = document.getElementById('r-client-nom').value.trim();
     if (!nom) { toast('Nom du client requis', '#e53935'); return; }
+    const plaque = (document.getElementById('r-plaque').value || '').trim().toUpperCase() || null;
+
+    // 3) Si la plaque saisie est déjà dans la base clients, on bascule en mode "existant"
+    if (plaque) {
+      // Vérif via cache local d'abord
+      let veh = cache.vehicules.find(v => v.plaque === plaque);
+      // Filet via Supabase (au cas où le cache n'est pas chargé)
+      if (!veh) {
+        const { data } = await sb.from('vehicules').select('id, client_id, plaque').eq('plaque', plaque).maybeSingle();
+        if (data) veh = data;
+      }
+      if (veh) {
+        const owner = cache.clients.find(c => c.id === veh.client_id);
+        const ownerName = owner ? owner.nom : 'un client enregistré';
+        if (confirm(`La plaque ${plaque} est déjà rattachée à : ${ownerName}.\nBasculer sur ce client enregistré ?`)) {
+          // Bascule automatique
+          if (!cache.clientsLoaded) await DB.loadClients();
+          setResaMode('existing');
+          document.getElementById('r-client-id').value   = veh.client_id;
+          document.getElementById('r-vehicule-id').value = veh.id;
+          const c = cache.clients.find(x => x.id === veh.client_id);
+          if (c) showSelectedClient(c, veh.id);
+          toast('Client trouvé — vérifie puis clique Enregistrer', '#1e40af');
+        }
+        return; // dans tous les cas, on stoppe ici (l'utilisateur valide manuellement)
+      }
+    }
+
     row.client_id   = null;
     row.vehicule_id = null;
     row.client_nom        = nom;
     row.client_telephone  = document.getElementById('r-client-telephone').value.trim() || null;
-    row.plaque            = (document.getElementById('r-plaque').value || '').trim().toUpperCase() || null;
+    row.plaque            = plaque;
     row.vehicule_type     = document.getElementById('r-vehicule-type').value;
   }
 
