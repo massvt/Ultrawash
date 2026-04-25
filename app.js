@@ -8,7 +8,7 @@ const session = { user: null, role: null };
 const isPatron = () => session.role === 'patron';
 
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
-const cache = { entrees: [], sorties: [] };
+const cache = { entrees: [], sorties: [], clients: [], vehicules: [], clientsLoaded: false };
 
 const DB = {
   getEntrees: () => cache.entrees,
@@ -68,6 +68,60 @@ const DB = {
     if (i !== -1) cache.sorties[i] = data;
     return data;
   },
+
+  // ===== Clients & véhicules =====
+  getClients:   () => cache.clients,
+  getVehicules: () => cache.vehicules,
+
+  async loadClients() {
+    const [{ data: c, error: ce }, { data: v, error: ve }] = await Promise.all([
+      sb.from('clients').select('*').order('nom', { ascending: true }),
+      sb.from('vehicules').select('*'),
+    ]);
+    if (ce) console.error('clients:', ce);
+    if (ve) console.error('vehicules:', ve);
+    cache.clients = c || [];
+    cache.vehicules = v || [];
+    cache.clientsLoaded = true;
+  },
+
+  async addClient(row) {
+    const { data, error } = await sb.from('clients').insert(row).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.clients.push(data);
+    cache.clients.sort((a, b) => a.nom.localeCompare(b.nom));
+    return data;
+  },
+
+  async updateClient(id, row) {
+    const { data, error } = await sb.from('clients').update(row).eq('id', id).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.clients.findIndex(c => c.id === id);
+    if (i !== -1) cache.clients[i] = data;
+    return data;
+  },
+
+  async delClient(id) {
+    const { error } = await sb.from('clients').delete().eq('id', id);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.clients = cache.clients.filter(c => c.id !== id);
+    cache.vehicules = cache.vehicules.filter(v => v.client_id !== id);
+    return true;
+  },
+
+  async addVehicule(row) {
+    const { data, error } = await sb.from('vehicules').insert(row).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.vehicules.push(data);
+    return data;
+  },
+
+  async delVehicule(id) {
+    const { error } = await sb.from('vehicules').delete().eq('id', id);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.vehicules = cache.vehicules.filter(v => v.id !== id);
+    return true;
+  },
 };
 
 // ===== NAVIGATION =====
@@ -97,6 +151,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.page === 'dashboard') renderDashboard();
     if (btn.dataset.page === 'entrees') renderEntreesList();
     if (btn.dataset.page === 'sorties') renderSortiesList();
+    if (btn.dataset.page === 'clients') renderClientsPage();
     if (btn.dataset.page === 'historique') renderHistorique();
     closeSidebar();
   });
@@ -420,21 +475,71 @@ setDefaultDateTime();
 
 document.getElementById('formEntree').addEventListener('submit', async (ev) => {
   ev.preventDefault();
+  const plaque = (document.getElementById('e-plaque').value || '').trim().toUpperCase();
+  let clientId   = document.getElementById('e-client-id').value || null;
+  let vehiculeId = document.getElementById('e-vehicule-id').value || null;
+
+  // Si on a une plaque mais pas de véhicule rattaché, on cherche en base
+  // (au cas où le cache local ne soit pas à jour)
+  if (plaque && !vehiculeId) {
+    const { data } = await sb.from('vehicules').select('id, client_id').eq('plaque', plaque).maybeSingle();
+    if (data) { vehiculeId = data.id; clientId = data.client_id; }
+  }
+
   const row = {
     date: document.getElementById('e-date').value,
     heure: document.getElementById('e-heure').value,
     vehicule: document.getElementById('e-vehicule').value,
     type: document.getElementById('e-type').value,
     montant: Number(document.getElementById('e-montant').value),
-    plaque: document.getElementById('e-plaque').value || null,
+    plaque: plaque || null,
     notes: document.getElementById('e-notes').value || null,
+    client_id: clientId,
+    vehicule_id: vehiculeId,
   };
   const saved = await DB.addEntree(row);
   if (!saved) return;
   ev.target.reset();
   setDefaultDateTime();
+  document.getElementById('e-client-id').value = '';
+  document.getElementById('e-vehicule-id').value = '';
+  document.getElementById('e-client-hint').innerHTML = '';
   renderEntreesList();
   toast('Lavage enregistré !');
+});
+
+// Auto-rattachement par plaque (debounced)
+let plaqueLookupTimer = null;
+document.getElementById('e-plaque').addEventListener('input', (ev) => {
+  clearTimeout(plaqueLookupTimer);
+  const hint = document.getElementById('e-client-hint');
+  const clientHidden = document.getElementById('e-client-id');
+  const vehHidden = document.getElementById('e-vehicule-id');
+  const plaque = ev.target.value.trim().toUpperCase();
+  clientHidden.value = '';
+  vehHidden.value = '';
+  hint.innerHTML = '';
+  if (plaque.length < 3) return;
+  plaqueLookupTimer = setTimeout(async () => {
+    const { data } = await sb
+      .from('vehicules')
+      .select('id, client_id, marque, modele, clients(nom, type, telephone)')
+      .eq('plaque', plaque)
+      .maybeSingle();
+    if (data && data.clients) {
+      clientHidden.value = data.client_id;
+      vehHidden.value = data.id;
+      const c = data.clients;
+      const veh = [data.marque, data.modele].filter(Boolean).join(' ');
+      hint.innerHTML = `<span class="hint-ok">✓ Client connu : <b>${c.nom}</b>${c.telephone ? ' · ' + c.telephone : ''}${veh ? ' · ' + veh : ''}</span>`;
+    } else {
+      hint.innerHTML = `<span class="hint-new">Plaque inconnue — sera enregistrée sans client. <a href="#" id="hint-create-client">Créer une fiche ?</a></span>`;
+      document.getElementById('hint-create-client').addEventListener('click', (e) => {
+        e.preventDefault();
+        openClientModal(null, { plaque });
+      });
+    }
+  }, 350);
 });
 
 function renderEntreesList() {
@@ -807,3 +912,262 @@ logoutBtn.addEventListener('click', async () => {
   if (!ok) return;
   await startApp();
 })();
+
+// ===== CLIENTS =====
+const clientModal = document.getElementById('clientModal');
+const ficheModal  = document.getElementById('ficheModal');
+let editingClientId = null;
+let editingClientNewVehicules = []; // pour création : on bufferise les véhicules avant insert
+let viewingClientId = null;
+
+async function renderClientsPage() {
+  if (!cache.clientsLoaded) {
+    await DB.loadClients();
+  }
+  renderClientsList();
+}
+
+function clientStats(clientId) {
+  const lavages = cache.entrees.filter(e => e.client_id === clientId);
+  const ca = lavages.reduce((a, e) => a + Number(e.montant || 0), 0);
+  const last = lavages.length ? lavages[0].date : null; // entrees triées desc
+  return { nb: lavages.length, ca, last };
+}
+
+function renderClientsList() {
+  const q = (document.getElementById('c-search').value || '').toLowerCase().trim();
+  const typeFilter = document.getElementById('c-filter-type').value;
+  const tbody = document.getElementById('clientsList');
+  const empty = document.getElementById('clientsEmpty');
+
+  const list = cache.clients.filter(c => {
+    if (typeFilter && c.type !== typeFilter) return false;
+    if (!q) return true;
+    if (c.nom.toLowerCase().includes(q)) return true;
+    if (c.telephone && c.telephone.toLowerCase().includes(q)) return true;
+    const vehs = cache.vehicules.filter(v => v.client_id === c.id);
+    return vehs.some(v => v.plaque.toLowerCase().includes(q));
+  });
+
+  if (list.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = list.map(c => {
+    const vehs = cache.vehicules.filter(v => v.client_id === c.id);
+    const st = clientStats(c.id);
+    const plaques = vehs.map(v => v.plaque).join(', ') || '—';
+    return `
+      <tr class="row-click" data-cid="${c.id}">
+        <td><b>${escapeHtml(c.nom)}</b></td>
+        <td><span class="badge badge-${c.type}">${c.type === 'entreprise' ? 'Entreprise' : 'Particulier'}</span></td>
+        <td>${escapeHtml(c.telephone || '—')}</td>
+        <td>${escapeHtml(plaques)}</td>
+        <td>${st.nb}</td>
+        <td class="montant-entree">${fmt(st.ca)}</td>
+        <td>${st.last ? fmtDate(st.last) : '—'}</td>
+        <td><button class="btn-edit" data-action="view" data-cid="${c.id}" title="Voir la fiche">👁</button></td>
+      </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('[data-action="view"]').forEach(b => {
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      openFiche(b.dataset.cid);
+    });
+  });
+  tbody.querySelectorAll('tr.row-click').forEach(tr => {
+    tr.addEventListener('click', () => openFiche(tr.dataset.cid));
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+document.getElementById('c-search').addEventListener('input', renderClientsList);
+document.getElementById('c-filter-type').addEventListener('change', renderClientsList);
+document.getElementById('btnNewClient').addEventListener('click', () => openClientModal(null));
+
+// ----- Modal client (create/edit) -----
+function openClientModal(clientId, prefill = {}) {
+  editingClientId = clientId;
+  editingClientNewVehicules = [];
+  document.getElementById('clientModalTitle').textContent = clientId ? 'Modifier le client' : 'Nouveau client';
+  const f = document.getElementById('formClient');
+  f.reset();
+  document.getElementById('cl-id').value = clientId || '';
+
+  if (clientId) {
+    const c = cache.clients.find(x => x.id === clientId);
+    if (!c) return;
+    document.getElementById('cl-type').value      = c.type;
+    document.getElementById('cl-nom').value       = c.nom || '';
+    document.getElementById('cl-telephone').value = c.telephone || '';
+    document.getElementById('cl-email').value     = c.email || '';
+    document.getElementById('cl-adresse').value   = c.adresse || '';
+    document.getElementById('cl-notes').value     = c.notes || '';
+  } else if (prefill.plaque) {
+    // pré-remplir un véhicule à la volée
+    editingClientNewVehicules.push({ plaque: prefill.plaque.toUpperCase(), marque: '', modele: '' });
+  }
+  renderVehiculesInModal();
+  clientModal.classList.add('show');
+}
+
+function closeClientModal() {
+  clientModal.classList.remove('show');
+  editingClientId = null;
+  editingClientNewVehicules = [];
+}
+document.getElementById('clientClose').addEventListener('click', closeClientModal);
+clientModal.querySelector('[data-modal-cancel]').addEventListener('click', closeClientModal);
+clientModal.addEventListener('click', (e) => { if (e.target === clientModal) closeClientModal(); });
+
+function renderVehiculesInModal() {
+  const list = document.getElementById('cl-vehicules-list');
+  const existing = editingClientId ? cache.vehicules.filter(v => v.client_id === editingClientId) : [];
+  const pending = editingClientNewVehicules;
+  if (existing.length === 0 && pending.length === 0) {
+    list.innerHTML = '<div class="empty-inline">Aucun véhicule.</div>';
+    return;
+  }
+  list.innerHTML = [
+    ...existing.map(v => `
+      <div class="vehicule-item">
+        <span><b>${escapeHtml(v.plaque)}</b>${v.marque || v.modele ? ' — ' + escapeHtml([v.marque, v.modele].filter(Boolean).join(' ')) : ''}</span>
+        <button type="button" class="btn-del" data-veh-id="${v.id}" title="Supprimer">✕</button>
+      </div>`),
+    ...pending.map((v, i) => `
+      <div class="vehicule-item pending">
+        <span><b>${escapeHtml(v.plaque)}</b>${v.marque || v.modele ? ' — ' + escapeHtml([v.marque, v.modele].filter(Boolean).join(' ')) : ''} <em>(à enregistrer)</em></span>
+        <button type="button" class="btn-del" data-pending-idx="${i}" title="Retirer">✕</button>
+      </div>`),
+  ].join('');
+  list.querySelectorAll('[data-veh-id]').forEach(b => {
+    b.addEventListener('click', async () => {
+      if (!confirm('Supprimer ce véhicule ?')) return;
+      const ok = await DB.delVehicule(b.dataset.vehId);
+      if (ok) renderVehiculesInModal();
+    });
+  });
+  list.querySelectorAll('[data-pending-idx]').forEach(b => {
+    b.addEventListener('click', () => {
+      editingClientNewVehicules.splice(Number(b.dataset.pendingIdx), 1);
+      renderVehiculesInModal();
+    });
+  });
+}
+
+document.getElementById('cl-veh-add').addEventListener('click', async () => {
+  const plaque = (document.getElementById('cl-veh-plaque').value || '').trim().toUpperCase();
+  const marque = document.getElementById('cl-veh-marque').value.trim();
+  const modele = document.getElementById('cl-veh-modele').value.trim();
+  if (!plaque) { toast('Plaque requise', '#e53935'); return; }
+  if (editingClientId) {
+    // ajout direct
+    const saved = await DB.addVehicule({ client_id: editingClientId, plaque, marque: marque || null, modele: modele || null });
+    if (saved) {
+      document.getElementById('cl-veh-plaque').value = '';
+      document.getElementById('cl-veh-marque').value = '';
+      document.getElementById('cl-veh-modele').value = '';
+      renderVehiculesInModal();
+    }
+  } else {
+    // bufferiser
+    if (editingClientNewVehicules.some(v => v.plaque === plaque)) { toast('Plaque déjà ajoutée', '#e53935'); return; }
+    editingClientNewVehicules.push({ plaque, marque, modele });
+    document.getElementById('cl-veh-plaque').value = '';
+    document.getElementById('cl-veh-marque').value = '';
+    document.getElementById('cl-veh-modele').value = '';
+    renderVehiculesInModal();
+  }
+});
+
+document.getElementById('formClient').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const row = {
+    type:      document.getElementById('cl-type').value,
+    nom:       document.getElementById('cl-nom').value.trim(),
+    telephone: document.getElementById('cl-telephone').value.trim() || null,
+    email:     document.getElementById('cl-email').value.trim() || null,
+    adresse:   document.getElementById('cl-adresse').value.trim() || null,
+    notes:     document.getElementById('cl-notes').value.trim() || null,
+  };
+  let client;
+  if (editingClientId) {
+    client = await DB.updateClient(editingClientId, row);
+  } else {
+    client = await DB.addClient(row);
+    if (client && editingClientNewVehicules.length) {
+      for (const v of editingClientNewVehicules) {
+        await DB.addVehicule({ client_id: client.id, plaque: v.plaque, marque: v.marque || null, modele: v.modele || null });
+      }
+    }
+  }
+  if (!client) return;
+  closeClientModal();
+  renderClientsList();
+  toast(editingClientId ? 'Client mis à jour' : 'Client créé');
+});
+
+// ----- Fiche client -----
+function openFiche(clientId) {
+  viewingClientId = clientId;
+  const c = cache.clients.find(x => x.id === clientId);
+  if (!c) return;
+  document.getElementById('ficheTitle').textContent = c.nom;
+  const st = clientStats(clientId);
+  document.getElementById('ficheInfo').innerHTML = `
+    <div class="info-grid">
+      <div><span>Type</span><b>${c.type === 'entreprise' ? 'Entreprise / Flotte' : 'Particulier'}</b></div>
+      <div><span>Téléphone</span><b>${escapeHtml(c.telephone || '—')}</b></div>
+      <div><span>Email</span><b>${escapeHtml(c.email || '—')}</b></div>
+      <div><span>Adresse</span><b>${escapeHtml(c.adresse || '—')}</b></div>
+      <div><span>Lavages</span><b>${st.nb}</b></div>
+      <div><span>CA total</span><b class="montant-entree">${fmt(st.ca)}</b></div>
+      <div><span>Dernière visite</span><b>${st.last ? fmtDate(st.last) : '—'}</b></div>
+      <div><span>Notes</span><b>${escapeHtml(c.notes || '—')}</b></div>
+    </div>`;
+
+  const vehs = cache.vehicules.filter(v => v.client_id === clientId);
+  document.getElementById('ficheVehicules').innerHTML = vehs.length
+    ? vehs.map(v => `<span class="veh-pill"><b>${escapeHtml(v.plaque)}</b>${v.marque || v.modele ? ' · ' + escapeHtml([v.marque, v.modele].filter(Boolean).join(' ')) : ''}</span>`).join('')
+    : '<div class="empty-inline">Aucun véhicule.</div>';
+
+  const lavages = cache.entrees.filter(e => e.client_id === clientId);
+  const tbody = document.getElementById('ficheHistorique');
+  const empty = document.getElementById('ficheEmpty');
+  if (lavages.length === 0) {
+    tbody.innerHTML = ''; empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    tbody.innerHTML = lavages.map(e => `
+      <tr>
+        <td>${fmtDate(e.date)} ${e.heure || ''}</td>
+        <td>${escapeHtml(e.vehicule || '')}</td>
+        <td>${escapeHtml(e.type || '')}</td>
+        <td>${escapeHtml(e.plaque || '—')}</td>
+        <td class="montant-entree">+${fmt(e.montant)}</td>
+      </tr>`).join('');
+  }
+  ficheModal.classList.add('show');
+}
+
+function closeFiche() { ficheModal.classList.remove('show'); viewingClientId = null; }
+document.getElementById('ficheClose').addEventListener('click', closeFiche);
+ficheModal.addEventListener('click', (e) => { if (e.target === ficheModal) closeFiche(); });
+
+document.getElementById('ficheEdit').addEventListener('click', () => {
+  const id = viewingClientId;
+  closeFiche();
+  openClientModal(id);
+});
+document.getElementById('ficheDelete').addEventListener('click', async () => {
+  if (!viewingClientId) return;
+  if (!confirm('Supprimer ce client ? Ses véhicules seront supprimés. Les lavages historiques sont conservés.')) return;
+  const ok = await DB.delClient(viewingClientId);
+  if (!ok) return;
+  closeFiche();
+  renderClientsList();
+  toast('Client supprimé', '#e53935');
+});

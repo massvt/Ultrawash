@@ -680,3 +680,50 @@ body.role-employe .patron-only { display: none !important; }
   transition: background .15s;
 }
 .btn-logout:hover { background: var(--sidebar-hover); }
+
+/* ===== CLIENTS ===== */
+.modal-large { max-width: 880px; }
+.modal-body  { padding: 22px; }
+.modal-body h4 { margin: 18px 0 10px; font-size: .95rem; color: var(--gray-700); }
+
+.client-hint { font-size: .85rem; margin-top: 6px; min-height: 18px; }
+.hint-ok  { color: #166534; }
+.hint-new { color: #92400e; }
+.hint-new a { color: #1e40af; text-decoration: underline; cursor: pointer; }
+
+.badge-particulier { background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 999px; font-size: .8rem; }
+.badge-entreprise  { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 999px; font-size: .8rem; }
+
+tr.row-click { cursor: pointer; }
+tr.row-click:hover { background: var(--gray-50, #f9fafb); }
+
+.vehicules-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.vehicule-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border: 1px solid var(--gray-100); border-radius: 8px;
+  background: #f9fafb; font-size: .9rem;
+}
+.vehicule-item.pending { background: #fffbeb; border-color: #fde68a; }
+.vehicule-add-row { gap: 8px; }
+.vehicule-add-row input { flex: 1; }
+
+.empty-inline { color: var(--gray-400); font-style: italic; font-size: .9rem; padding: 6px 0; }
+
+.fiche-info .info-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 12px;
+}
+.fiche-info .info-grid > div {
+  background: #f9fafb; padding: 10px 12px; border-radius: 8px;
+}
+.fiche-info .info-grid span { display: block; font-size: .75rem; color: var(--gray-400); text-transform: uppercase; }
+.fiche-info .info-grid b { font-size: .95rem; }
+
+.fiche-vehicules { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.veh-pill {
+  display: inline-block; padding: 6px 12px; border-radius: 999px;
+  background: #eef2ff; color: #3730a3; font-size: .85rem;
+}
+
+/* La modal-form (clients) doit être affichée par défaut quand .active */
+#formClient.active { display: block; }

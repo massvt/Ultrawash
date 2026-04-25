@@ -47,6 +47,9 @@
       <button class="nav-btn patron-only" data-page="sorties">
         <span class="icon">➖</span> Sorties
       </button>
+      <button class="nav-btn" data-page="clients">
+        <span class="icon">👥</span> Clients
+      </button>
       <button class="nav-btn" data-page="historique">
         <span class="icon">📋</span> Historique
       </button>
@@ -203,9 +206,12 @@
             </div>
             <div class="form-group">
               <label>N° plaque (optionnel)</label>
-              <input type="text" id="e-plaque" placeholder="ex: DK-1234-AB" />
+              <input type="text" id="e-plaque" placeholder="ex: DK-1234-AB" autocomplete="off" />
+              <div id="e-client-hint" class="client-hint"></div>
             </div>
           </div>
+          <input type="hidden" id="e-client-id" />
+          <input type="hidden" id="e-vehicule-id" />
           <div class="form-group">
             <label>Notes</label>
             <input type="text" id="e-notes" placeholder="Remarques..." />
@@ -273,6 +279,48 @@
           <tbody id="sortiesList"></tbody>
         </table></div>
       </div>
+    </section>
+
+    <!-- CLIENTS -->
+    <section id="page-clients" class="page">
+      <header class="page-header">
+        <h1>Clients</h1>
+        <div class="header-actions">
+          <button class="btn-primary" id="btnNewClient">+ Nouveau client</button>
+        </div>
+      </header>
+
+      <div class="filter-bar">
+        <div class="filter-group" style="flex:1;min-width:200px">
+          <label>Rechercher</label>
+          <input type="text" id="c-search" placeholder="Nom, téléphone, plaque…" />
+        </div>
+        <div class="filter-group">
+          <label>Type</label>
+          <select id="c-filter-type">
+            <option value="">Tous</option>
+            <option value="particulier">Particuliers</option>
+            <option value="entreprise">Entreprises / Flottes</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrap"><table class="table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Type</th>
+            <th>Téléphone</th>
+            <th>Véhicules</th>
+            <th>Lavages</th>
+            <th>CA total</th>
+            <th>Dernière visite</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="clientsList"></tbody>
+      </table></div>
+      <div id="clientsEmpty" class="empty-state">Aucun client trouvé.</div>
     </section>
 
     <!-- HISTORIQUE -->
@@ -448,6 +496,91 @@
           <button type="submit" class="btn-danger">Enregistrer</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL CLIENT (création / édition) -->
+  <div id="clientModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="clientModalTitle">Nouveau client</h3>
+        <button type="button" class="modal-close" id="clientClose" aria-label="Fermer">✕</button>
+      </div>
+      <form id="formClient" class="modal-form active">
+        <input type="hidden" id="cl-id" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type</label>
+            <select id="cl-type">
+              <option value="particulier">Particulier</option>
+              <option value="entreprise">Entreprise / Flotte</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Nom / Raison sociale</label>
+            <input type="text" id="cl-nom" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Téléphone</label>
+            <input type="tel" id="cl-telephone" />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="cl-email" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Adresse</label>
+          <input type="text" id="cl-adresse" />
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" id="cl-notes" />
+        </div>
+
+        <div class="form-group" id="cl-vehicules-section">
+          <label>Véhicules</label>
+          <div id="cl-vehicules-list" class="vehicules-list"></div>
+          <div class="form-row vehicule-add-row">
+            <input type="text" id="cl-veh-plaque" placeholder="Plaque" />
+            <input type="text" id="cl-veh-marque" placeholder="Marque (opt.)" />
+            <input type="text" id="cl-veh-modele" placeholder="Modèle (opt.)" />
+            <button type="button" class="btn-outline" id="cl-veh-add">+ Ajouter</button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" data-modal-cancel>Annuler</button>
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL FICHE CLIENT (lecture + historique) -->
+  <div id="ficheModal" class="modal-overlay">
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <h3 id="ficheTitle">Fiche client</h3>
+        <button type="button" class="modal-close" id="ficheClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="ficheInfo" class="fiche-info"></div>
+        <h4>Véhicules</h4>
+        <div id="ficheVehicules" class="fiche-vehicules"></div>
+        <h4>Historique des lavages</h4>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Plaque</th><th>Montant</th></tr></thead>
+          <tbody id="ficheHistorique"></tbody>
+        </table></div>
+        <div id="ficheEmpty" class="empty-state">Aucun lavage enregistré pour ce client.</div>
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" id="ficheEdit">Modifier</button>
+          <button type="button" class="btn-danger patron-only" id="ficheDelete">Supprimer le client</button>
+        </div>
+      </div>
     </div>
   </div>
 
