@@ -219,15 +219,23 @@ nav { display: flex; flex-direction: column; gap: 4px; }
   display: flex;
   align-items: flex-start;
 }
-.kpi-value { font-size: 1.45rem; font-weight: 700; line-height: 1.1; margin: 4px 0; }
-.kpi-sub   { font-size: 0.8rem; color: var(--gray-400); }
+.kpi-value {
+  font-size: clamp(1rem, 1.3vw, 1.35rem);
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi-sub   { font-size: 0.8rem; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .kpi-card.ca .kpi-value       { color: var(--blue); }
 .kpi-card.depenses .kpi-value  { color: var(--red); }
 .kpi-card.benefice .kpi-value  { color: var(--green); }
 .kpi-card.lavages .kpi-value   { color: var(--orange); }
 .kpi-card.panier .kpi-value    { color: #8b5cf6; }
-.kpi-card.bestday .kpi-value   { color: #14b8a6; font-size: 1.15rem; }
+.kpi-card.bestday .kpi-value   { color: #14b8a6; font-size: clamp(0.9rem, 1.05vw, 1.1rem); }
 
 /* ===== CHARTS ===== */
 .charts-row {
