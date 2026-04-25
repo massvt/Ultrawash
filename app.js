@@ -1556,10 +1556,18 @@ document.getElementById('formResa').addEventListener('submit', async (ev) => {
     notes:        document.getElementById('r-notes').value.trim() || null,
   };
 
-  // 1) Refuser une date dans le passé
-  if (row.date_prevue < todayYmd()) {
+  // 1) Refuser une date dans le passé (et une heure passée si c'est aujourd'hui)
+  const today = todayYmd();
+  if (row.date_prevue < today) {
     toast('Impossible de réserver à une date passée', '#e53935');
     return;
+  }
+  if (row.date_prevue === today) {
+    const nowHM = new Date().toTimeString().slice(0,5);
+    if (row.heure_prevue < nowHM) {
+      toast(`Heure passée — il est déjà ${nowHM}`, '#e53935');
+      return;
+    }
   }
 
   // 2) Refuser un conflit de créneau (même date + même heure, statut prevu)
