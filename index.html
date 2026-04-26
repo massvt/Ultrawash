@@ -488,17 +488,20 @@
       <header class="page-header">
         <h1>Services & Tarifs</h1>
         <div class="header-actions">
+          <button class="btn-outline" id="btnAddSvcCat">+ Nouvelle catégorie</button>
           <button class="btn-primary" id="btnAddService">+ Nouveau service</button>
         </div>
       </header>
       <p class="tarifs-hint">Modifie le prix puis clique sur 💾. Désactive un service obsolète avec le toggle (il ne sera plus proposé à la saisie). Les entrées passées ne sont pas affectées.</p>
+      <div id="addSvcCatForm" class="vt-add-bar" style="display:none">
+        <input type="text" id="svccat-new-name" placeholder="Nom de la catégorie" maxlength="40" />
+        <input type="text" id="svccat-new-icon" placeholder="Émoji (ex: 🛞)" maxlength="4" style="width:90px;text-align:center" />
+        <button class="btn-primary" id="svccat-add-btn">Créer</button>
+        <button class="btn-outline" id="svccat-add-cancel">Annuler</button>
+      </div>
       <div id="addServiceForm" class="vt-add-bar" style="display:none">
         <input type="text" id="svc-new-name" placeholder="Nom du service" maxlength="50" />
-        <select id="svc-new-cat">
-          <option value="Lavage">🧼 Lavage</option>
-          <option value="Detailing">✨ Detailing</option>
-          <option value="Entretien">🔧 Entretien</option>
-        </select>
+        <select id="svc-new-cat"></select>
         <input type="number" id="svc-new-prix" min="0" step="100" placeholder="Prix FCFA" />
         <button class="btn-primary" id="svc-add-btn">Créer</button>
         <button class="btn-outline" id="svc-add-cancel">Annuler</button>
@@ -510,10 +513,20 @@
     <section id="page-vehicules" class="page">
       <header class="page-header">
         <h1>Types de véhicule</h1>
+        <div class="header-actions">
+          <button class="btn-outline" id="btnAddVtCat">+ Nouvelle catégorie</button>
+        </div>
       </header>
-      <p class="tarifs-hint">Gère la liste des types de véhicule proposés à la saisie. Désactive un type au lieu de le supprimer si des entrées y font référence.</p>
+      <p class="tarifs-hint">Gère les types de véhicule proposés à la saisie, regroupés par catégorie. Désactive un type au lieu de le supprimer si des entrées y font référence.</p>
+      <div id="addVtCatForm" class="vt-add-bar" style="display:none">
+        <input type="text" id="vtcat-new-name" placeholder="Nom de la catégorie" maxlength="40" />
+        <input type="text" id="vtcat-new-icon" placeholder="Émoji (ex: 🚙)" maxlength="4" style="width:90px;text-align:center" />
+        <button class="btn-primary" id="vtcat-add-btn">Créer</button>
+        <button class="btn-outline" id="vtcat-add-cancel">Annuler</button>
+      </div>
       <div class="vt-add-bar">
         <input type="text" id="vt-new-name" placeholder="Nouveau type (ex: Quad)" maxlength="40" />
+        <select id="vt-new-cat"></select>
         <button class="btn-primary" id="vt-add-btn">+ Ajouter</button>
       </div>
       <div id="vehiculesList" class="tarifs-accordion"></div>

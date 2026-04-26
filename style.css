@@ -901,6 +901,25 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .tarif-cat[open] .tarif-cat-chevron { transform: rotate(180deg); }
 .tarif-cat-detailing .tarif-cat-count { background: #6366f1; }
 .tarif-cat-entretien .tarif-cat-count { background: #f59e0b; }
+.cat-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.tarif-cat:hover .cat-actions,
+.tarif-cat[open] .cat-actions { opacity: 1; }
+.cat-action {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: .9rem;
+  transition: background .15s;
+}
+.cat-action:hover { background: rgba(15,23,42,0.08); }
+.cat-del:hover { background: #fee2e2; }
 .tarif-list {
   display: flex;
   flex-direction: column;

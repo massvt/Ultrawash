@@ -8,16 +8,18 @@ const session = { user: null, role: null };
 const isPatron = () => session.role === 'patron';
 
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
-const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], vehiculeTypes: [], clientsLoaded: false };
+const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], vehiculeTypes: [], serviceCategories: [], vehiculeCategories: [], clientsLoaded: false };
 
 // Map nom_service → prix (rempli au boot, utilisé pour pré-remplir le montant)
 const PRIX = {};
 
 const DB = {
-  getEntrees:       () => cache.entrees,
-  getSorties:       () => cache.sorties,
-  getServices:      () => cache.services,
-  getVehiculeTypes: () => cache.vehiculeTypes,
+  getEntrees:            () => cache.entrees,
+  getSorties:            () => cache.sorties,
+  getServices:           () => cache.services,
+  getVehiculeTypes:      () => cache.vehiculeTypes,
+  getServiceCategories:  () => cache.serviceCategories,
+  getVehiculeCategories: () => cache.vehiculeCategories,
 
   async loadAll() {
     const [
@@ -26,31 +28,130 @@ const DB = {
       { data: r,  error: re },
       { data: sv, error: sve },
       { data: vt, error: vte },
+      { data: sc, error: sce },
+      { data: vc, error: vce },
     ] = await Promise.all([
       sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false }),
       sb.from('sorties').select('*').order('date', { ascending: false }),
       sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true }),
       sb.from('services').select('*').order('ordre', { ascending: true }),
       sb.from('vehicule_types').select('*').order('ordre', { ascending: true }),
+      sb.from('service_categories').select('*').order('ordre', { ascending: true }),
+      sb.from('vehicule_categories').select('*').order('ordre', { ascending: true }),
     ]);
     if (ee)  console.error('entrees:', ee);
     if (se)  console.error('sorties:', se);
     if (re)  console.error('reservations:', re);
     if (sve) console.error('services:', sve);
     if (vte) console.error('vehicule_types:', vte);
-    cache.entrees       = e || [];
-    cache.sorties       = s || [];
-    cache.reservations  = r || [];
-    cache.services      = sv || [];
-    cache.vehiculeTypes = vt || [];
+    if (sce) console.error('service_categories:', sce);
+    if (vce) console.error('vehicule_categories:', vce);
+    cache.entrees            = e  || [];
+    cache.sorties            = s  || [];
+    cache.reservations       = r  || [];
+    cache.services           = sv || [];
+    cache.vehiculeTypes      = vt || [];
+    cache.serviceCategories  = sc || [];
+    cache.vehiculeCategories = vc || [];
     Object.keys(PRIX).forEach(k => delete PRIX[k]);
     (sv || []).filter(s => s.actif).forEach(svc => { PRIX[svc.nom] = svc.prix; });
   },
 
-  async addVehiculeType(nom) {
-    const next = (cache.vehiculeTypes.reduce((m, v) => Math.max(m, v.ordre), 0) || 0) + 10;
+  // ===== Catégories de services =====
+  async addServiceCategory(nom, icon) {
+    const next = (cache.serviceCategories.reduce((m, c) => Math.max(m, c.ordre), 0) || 0) + 10;
+    const { data, error } = await sb.from('service_categories')
+      .insert({ nom, icon: icon || '📦', ordre: next, actif: true }).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.serviceCategories.push(data);
+    cache.serviceCategories.sort((a, b) => a.ordre - b.ordre);
+    return data;
+  },
+
+  async renameServiceCategory(oldNom, newNom, icon) {
+    if (oldNom !== newNom && cache.serviceCategories.some(c => c.nom.toLowerCase() === newNom.toLowerCase())) {
+      toast('Une catégorie porte déjà ce nom', '#e53935'); return false;
+    }
+    const patch = { updated_at: new Date().toISOString() };
+    if (newNom !== oldNom) patch.nom = newNom;
+    if (icon != null) patch.icon = icon;
+    const { error: e1 } = await sb.from('service_categories').update(patch).eq('nom', oldNom);
+    if (e1) { toast('Erreur : ' + e1.message, '#e53935'); return false; }
+    if (newNom !== oldNom) {
+      const { error: e2 } = await sb.from('services').update({ categorie: newNom }).eq('categorie', oldNom);
+      if (e2) { toast('Renommé mais services non propagés : ' + e2.message, '#e53935'); }
+    }
+    await DB.loadAll();
+    return true;
+  },
+
+  async delServiceCategory(nom) {
+    const used = cache.services.some(s => s.categorie === nom);
+    if (used) {
+      toast('Catégorie utilisée : déplace ou supprime d\'abord ses services', '#e53935');
+      return false;
+    }
+    const { error } = await sb.from('service_categories').delete().eq('nom', nom);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.serviceCategories = cache.serviceCategories.filter(c => c.nom !== nom);
+    return true;
+  },
+
+  // ===== Catégories de véhicules =====
+  async addVehiculeCategory(nom, icon) {
+    const next = (cache.vehiculeCategories.reduce((m, c) => Math.max(m, c.ordre), 0) || 0) + 10;
+    const { data, error } = await sb.from('vehicule_categories')
+      .insert({ nom, icon: icon || '🚗', ordre: next, actif: true }).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.vehiculeCategories.push(data);
+    cache.vehiculeCategories.sort((a, b) => a.ordre - b.ordre);
+    return data;
+  },
+
+  async renameVehiculeCategory(oldNom, newNom, icon) {
+    if (oldNom !== newNom && cache.vehiculeCategories.some(c => c.nom.toLowerCase() === newNom.toLowerCase())) {
+      toast('Une catégorie porte déjà ce nom', '#e53935'); return false;
+    }
+    const patch = { updated_at: new Date().toISOString() };
+    if (newNom !== oldNom) patch.nom = newNom;
+    if (icon != null) patch.icon = icon;
+    const { error: e1 } = await sb.from('vehicule_categories').update(patch).eq('nom', oldNom);
+    if (e1) { toast('Erreur : ' + e1.message, '#e53935'); return false; }
+    if (newNom !== oldNom) {
+      const { error: e2 } = await sb.from('vehicule_types').update({ categorie: newNom }).eq('categorie', oldNom);
+      if (e2) { toast('Renommé mais types non propagés : ' + e2.message, '#e53935'); }
+    }
+    await DB.loadAll();
+    return true;
+  },
+
+  async delVehiculeCategory(nom) {
+    const used = cache.vehiculeTypes.some(v => v.categorie === nom);
+    if (used) {
+      toast('Catégorie utilisée : déplace ou supprime d\'abord ses types', '#e53935');
+      return false;
+    }
+    const { error } = await sb.from('vehicule_categories').delete().eq('nom', nom);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.vehiculeCategories = cache.vehiculeCategories.filter(c => c.nom !== nom);
+    return true;
+  },
+
+  async setVehiculeTypeCategorie(nom, categorie) {
     const { data, error } = await sb.from('vehicule_types')
-      .insert({ nom, ordre: next }).select().single();
+      .update({ categorie, updated_at: new Date().toISOString() })
+      .eq('nom', nom).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.vehiculeTypes.findIndex(v => v.nom === nom);
+    if (i !== -1) cache.vehiculeTypes[i] = data;
+    return data;
+  },
+
+  async addVehiculeType(nom, categorie) {
+    const next = (cache.vehiculeTypes.reduce((m, v) => Math.max(m, v.ordre), 0) || 0) + 10;
+    const row = { nom, ordre: next };
+    if (categorie) row.categorie = categorie;
+    const { data, error } = await sb.from('vehicule_types').insert(row).select().single();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
     cache.vehiculeTypes.push(data);
     cache.vehiculeTypes.sort((a, b) => a.ordre - b.ordre);
@@ -1094,18 +1195,17 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 });
 
 // ===== TARIFS / SERVICES (admin patron) =====
-const TARIF_CATS = [
-  { key: 'Lavage',    icon: '🧼', label: 'Lavage' },
-  { key: 'Detailing', icon: '✨', label: 'Detailing automobile' },
-  { key: 'Entretien', icon: '🔧', label: 'Entretien rapide' },
-];
+function activeServiceCats() {
+  return DB.getServiceCategories().filter(c => c.actif).slice().sort((a, b) => a.ordre - b.ordre);
+}
 
 function refreshServiceSelects() {
   const services = DB.getServices().filter(s => s.actif).slice().sort((a, b) => a.ordre - b.ordre);
-  const html = TARIF_CATS.map(cat => {
-    const items = services.filter(s => s.categorie === cat.key);
+  const cats = activeServiceCats();
+  const html = cats.map(cat => {
+    const items = services.filter(s => s.categorie === cat.nom);
     if (!items.length) return '';
-    return `<optgroup label="${cat.icon} ${cat.label}">${
+    return `<optgroup label="${cat.icon || ''} ${escapeHtml(cat.nom)}">${
       items.map(s => `<option>${escapeHtml(s.nom)}</option>`).join('')
     }</optgroup>`;
   }).join('');
@@ -1122,12 +1222,18 @@ function refreshServiceSelects() {
 function renderTarifsPage() {
   const wrap = document.getElementById('tarifsAccordion');
   const services = DB.getServices().slice().sort((a, b) => a.ordre - b.ordre);
+  const cats = activeServiceCats();
 
-  wrap.innerHTML = TARIF_CATS.map((cat, idx) => {
-    const items = services.filter(s => s.categorie === cat.key);
+  if (!cats.length) {
+    wrap.innerHTML = '<div class="tarif-row" style="color:#94a3b8;font-style:italic;padding:24px">Aucune catégorie. Crée-en une ci-dessus.</div>';
+    return;
+  }
+
+  wrap.innerHTML = cats.map((cat, idx) => {
+    const items = services.filter(s => s.categorie === cat.nom);
     const rows = items.map(s => {
-      const catOpts = TARIF_CATS.map(c =>
-        `<option value="${c.key}" ${c.key === s.categorie ? 'selected' : ''}>${c.icon} ${c.label}</option>`
+      const catOpts = cats.map(c =>
+        `<option value="${escapeHtml(c.nom)}" ${c.nom === s.categorie ? 'selected' : ''}>${c.icon || ''} ${escapeHtml(c.nom)}</option>`
       ).join('');
       return `
       <div class="tarif-row ${s.actif ? '' : 'inactive'}" data-nom="${escapeHtml(s.nom)}" draggable="true">
@@ -1150,16 +1256,22 @@ function renderTarifsPage() {
       </div>`;
     }).join('') || '<div class="tarif-row" style="color:#94a3b8;font-style:italic">Aucun service dans cette catégorie</div>';
     return `
-      <details class="tarif-cat tarif-cat-${cat.key.toLowerCase()}" ${idx === 0 ? 'open' : ''}>
+      <details class="tarif-cat" data-cat="${escapeHtml(cat.nom)}" ${idx === 0 ? 'open' : ''}>
         <summary>
-          <span class="tarif-cat-icon">${cat.icon}</span>
-          <span class="tarif-cat-name">${cat.label}</span>
+          <span class="tarif-cat-icon">${cat.icon || ''}</span>
+          <span class="tarif-cat-name">${escapeHtml(cat.nom)}</span>
           <span class="tarif-cat-count">${items.length}</span>
+          <span class="cat-actions">
+            <button type="button" class="cat-action cat-rename" title="Renommer la catégorie">✏️</button>
+            <button type="button" class="cat-action cat-del" title="Supprimer la catégorie">🗑️</button>
+          </span>
           <span class="tarif-cat-chevron">▾</span>
         </summary>
         <div class="tarif-list">${rows}</div>
       </details>`;
   }).join('');
+
+  bindCategoryHeaderActions(wrap, 'service');
 
   wrap.querySelectorAll('.tarif-save').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -1252,8 +1364,23 @@ function renderTarifsPage() {
   });
 }
 
+// Peupler les selects de catégorie dans les forms d'ajout
+function refreshCategorySelectsInForms() {
+  const sCats = activeServiceCats();
+  const svcCatSel = document.getElementById('svc-new-cat');
+  if (svcCatSel) {
+    svcCatSel.innerHTML = sCats.map(c => `<option value="${escapeHtml(c.nom)}">${c.icon || ''} ${escapeHtml(c.nom)}</option>`).join('');
+  }
+  const vCats = activeVehiculeCats();
+  const vtCatSel = document.getElementById('vt-new-cat');
+  if (vtCatSel) {
+    vtCatSel.innerHTML = vCats.map(c => `<option value="${escapeHtml(c.nom)}">${c.icon || ''} ${escapeHtml(c.nom)}</option>`).join('');
+  }
+}
+
 // Bouton "+ Nouveau service" et formulaire d'ajout
 document.getElementById('btnAddService').addEventListener('click', () => {
+  refreshCategorySelectsInForms();
   const f = document.getElementById('addServiceForm');
   f.style.display = f.style.display === 'none' ? 'flex' : 'none';
   if (f.style.display === 'flex') document.getElementById('svc-new-name').focus();
@@ -1305,39 +1432,72 @@ function refreshVehiculeSelects() {
   }
 }
 
+function activeVehiculeCats() {
+  return DB.getVehiculeCategories().filter(c => c.actif).slice().sort((a, b) => a.ordre - b.ordre);
+}
+
 function renderVehiculesPage() {
   const wrap = document.getElementById('vehiculesList');
   const types = DB.getVehiculeTypes().slice().sort((a, b) => a.ordre - b.ordre);
-  if (!types.length) {
-    wrap.innerHTML = '<div class="tarif-row" style="color:#94a3b8;font-style:italic">Aucun type. Ajoutes-en un ci-dessus.</div>';
+  const cats = activeVehiculeCats();
+
+  if (!cats.length) {
+    wrap.innerHTML = '<div class="tarif-row" style="color:#94a3b8;font-style:italic;padding:24px">Aucune catégorie. Crée-en une ci-dessus.</div>';
     return;
   }
-  wrap.innerHTML = `
-    <details class="tarif-cat" open>
-      <summary>
-        <span class="tarif-cat-icon">🚗</span>
-        <span class="tarif-cat-name">Types de véhicule</span>
-        <span class="tarif-cat-count">${types.length}</span>
-        <span class="tarif-cat-chevron">▾</span>
-      </summary>
-      <div class="tarif-list">
-        ${types.map(v => `
-          <div class="tarif-row ${v.actif ? '' : 'inactive'}" data-nom="${escapeHtml(v.nom)}" draggable="true">
-            <span class="tarif-handle" title="Glisser pour réordonner">⋮⋮</span>
-            <div class="tarif-name">
-              <span class="tarif-name-text">${escapeHtml(v.nom)}</span>${v.actif ? '' : ' <span class="badge-off">désactivé</span>'}
-              <button type="button" class="tarif-rename vt-rename" title="Renommer">✏️</button>
-            </div>
-            <div class="tarif-edit">
-              <label class="switch" title="${v.actif ? 'Désactiver' : 'Activer'}">
-                <input type="checkbox" class="vt-toggle" ${v.actif ? 'checked' : ''} />
-                <span class="slider"></span>
-              </label>
-              <button type="button" class="tarif-save vt-del" title="Supprimer définitivement" style="background:#dc2626">🗑️</button>
-            </div>
-          </div>`).join('')}
-      </div>
-    </details>`;
+
+  wrap.innerHTML = cats.map((cat, idx) => {
+    const items = types.filter(v => (v.categorie || 'Tous') === cat.nom);
+    const rows = items.map(v => {
+      const catOpts = cats.map(c =>
+        `<option value="${escapeHtml(c.nom)}" ${c.nom === (v.categorie || 'Tous') ? 'selected' : ''}>${c.icon || ''} ${escapeHtml(c.nom)}</option>`
+      ).join('');
+      return `
+        <div class="tarif-row ${v.actif ? '' : 'inactive'}" data-nom="${escapeHtml(v.nom)}" draggable="true">
+          <span class="tarif-handle" title="Glisser pour réordonner">⋮⋮</span>
+          <div class="tarif-name">
+            <span class="tarif-name-text">${escapeHtml(v.nom)}</span>${v.actif ? '' : ' <span class="badge-off">désactivé</span>'}
+            <button type="button" class="tarif-rename vt-rename" title="Renommer">✏️</button>
+          </div>
+          <div class="tarif-edit">
+            <select class="tarif-cat-select vt-cat-select" title="Changer de catégorie">${catOpts}</select>
+            <label class="switch" title="${v.actif ? 'Désactiver' : 'Activer'}">
+              <input type="checkbox" class="vt-toggle" ${v.actif ? 'checked' : ''} />
+              <span class="slider"></span>
+            </label>
+            <button type="button" class="tarif-save vt-del" title="Supprimer définitivement" style="background:#dc2626">🗑️</button>
+          </div>
+        </div>`;
+    }).join('') || '<div class="tarif-row" style="color:#94a3b8;font-style:italic">Aucun type dans cette catégorie</div>';
+    return `
+      <details class="tarif-cat" data-cat="${escapeHtml(cat.nom)}" ${idx === 0 ? 'open' : ''}>
+        <summary>
+          <span class="tarif-cat-icon">${cat.icon || '🚗'}</span>
+          <span class="tarif-cat-name">${escapeHtml(cat.nom)}</span>
+          <span class="tarif-cat-count">${items.length}</span>
+          <span class="cat-actions">
+            <button type="button" class="cat-action cat-rename" title="Renommer la catégorie">✏️</button>
+            <button type="button" class="cat-action cat-del" title="Supprimer la catégorie">🗑️</button>
+          </span>
+          <span class="tarif-cat-chevron">▾</span>
+        </summary>
+        <div class="tarif-list">${rows}</div>
+      </details>`;
+  }).join('');
+
+  bindCategoryHeaderActions(wrap, 'vehicule');
+
+  wrap.querySelectorAll('.vt-cat-select').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const nom = sel.closest('.tarif-row').dataset.nom;
+      const saved = await DB.setVehiculeTypeCategorie(nom, sel.value);
+      if (saved) {
+        toast(`${nom} déplacé en ${sel.value}`);
+        renderVehiculesPage();
+        refreshVehiculeSelects();
+      }
+    });
+  });
 
   wrap.querySelectorAll('.vt-toggle').forEach(chk => {
     chk.addEventListener('change', async () => {
@@ -1398,6 +1558,41 @@ function renderVehiculesPage() {
   });
 }
 
+// Helper boutons rename/delete sur les headers de catégorie (services ou véhicules)
+function bindCategoryHeaderActions(wrap, kind) {
+  const isService = kind === 'service';
+  const cats = isService ? DB.getServiceCategories() : DB.getVehiculeCategories();
+  const renameMethod = isService ? 'renameServiceCategory' : 'renameVehiculeCategory';
+  const delMethod    = isService ? 'delServiceCategory'    : 'delVehiculeCategory';
+  const onChange = isService
+    ? () => { renderTarifsPage(); refreshServiceSelects(); }
+    : () => { renderVehiculesPage(); refreshVehiculeSelects(); };
+
+  wrap.querySelectorAll('.cat-rename').forEach(btn => {
+    btn.addEventListener('click', async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const oldNom = btn.closest('details').dataset.cat;
+      const cat = cats.find(c => c.nom === oldNom);
+      const newNom = (prompt('Nom de la catégorie :', oldNom) || '').trim();
+      if (!newNom) return;
+      const newIcon = (prompt('Émoji (laisse tel quel pour garder)', cat?.icon || '') || '').trim() || (cat?.icon || '');
+      const ok = await DB[renameMethod](oldNom, newNom, newIcon);
+      if (ok) { toast('Catégorie mise à jour'); onChange(); }
+    });
+  });
+  wrap.querySelectorAll('.cat-del').forEach(btn => {
+    btn.addEventListener('click', async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const nom = btn.closest('details').dataset.cat;
+      if (!confirm(`Supprimer la catégorie "${nom}" ?\nElle doit être vide. L'historique des entrées n'est pas affecté.`)) return;
+      const ok = await DB[delMethod](nom);
+      if (ok) { toast(`Catégorie "${nom}" supprimée`); onChange(); }
+    });
+  });
+}
+
 // Helper drag & drop : glisser pour réordonner les .tarif-row dans un container.
 // onReorder() est appelé une fois après le drop.
 function attachDragSort(container, onReorder) {
@@ -1430,16 +1625,77 @@ function attachDragSort(container, onReorder) {
 
 document.getElementById('vt-add-btn').addEventListener('click', async () => {
   const nom = document.getElementById('vt-new-name').value.trim();
+  const cat = document.getElementById('vt-new-cat').value || 'Tous';
   if (!nom) { toast('Nom obligatoire', '#e53935'); return; }
   if (DB.getVehiculeTypes().some(v => v.nom.toLowerCase() === nom.toLowerCase())) {
     toast('Ce type existe déjà', '#e53935'); return;
   }
-  const saved = await DB.addVehiculeType(nom);
+  const saved = await DB.addVehiculeType(nom, cat);
   if (saved) {
     toast(`Type "${nom}" ajouté`);
     document.getElementById('vt-new-name').value = '';
     renderVehiculesPage();
     refreshVehiculeSelects();
+  }
+});
+
+// Catégories : "+ Nouvelle catégorie" services
+document.getElementById('btnAddSvcCat').addEventListener('click', () => {
+  const f = document.getElementById('addSvcCatForm');
+  f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+  if (f.style.display === 'flex') document.getElementById('svccat-new-name').focus();
+});
+document.getElementById('svccat-add-cancel').addEventListener('click', () => {
+  document.getElementById('addSvcCatForm').style.display = 'none';
+  document.getElementById('svccat-new-name').value = '';
+  document.getElementById('svccat-new-icon').value = '';
+});
+document.getElementById('svccat-add-btn').addEventListener('click', async () => {
+  const nom  = document.getElementById('svccat-new-name').value.trim();
+  const icon = document.getElementById('svccat-new-icon').value.trim() || '📦';
+  if (!nom) { toast('Nom obligatoire', '#e53935'); return; }
+  if (DB.getServiceCategories().some(c => c.nom.toLowerCase() === nom.toLowerCase())) {
+    toast('Catégorie déjà existante', '#e53935'); return;
+  }
+  const saved = await DB.addServiceCategory(nom, icon);
+  if (saved) {
+    toast(`Catégorie "${nom}" créée`);
+    document.getElementById('svccat-new-name').value = '';
+    document.getElementById('svccat-new-icon').value = '';
+    document.getElementById('addSvcCatForm').style.display = 'none';
+    renderTarifsPage();
+    refreshServiceSelects();
+    refreshCategorySelectsInForms();
+  }
+});
+
+// Catégories : "+ Nouvelle catégorie" véhicules
+document.getElementById('btnAddVtCat').addEventListener('click', () => {
+  const f = document.getElementById('addVtCatForm');
+  f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+  if (f.style.display === 'flex') document.getElementById('vtcat-new-name').focus();
+});
+document.getElementById('vtcat-add-cancel').addEventListener('click', () => {
+  document.getElementById('addVtCatForm').style.display = 'none';
+  document.getElementById('vtcat-new-name').value = '';
+  document.getElementById('vtcat-new-icon').value = '';
+});
+document.getElementById('vtcat-add-btn').addEventListener('click', async () => {
+  const nom  = document.getElementById('vtcat-new-name').value.trim();
+  const icon = document.getElementById('vtcat-new-icon').value.trim() || '🚗';
+  if (!nom) { toast('Nom obligatoire', '#e53935'); return; }
+  if (DB.getVehiculeCategories().some(c => c.nom.toLowerCase() === nom.toLowerCase())) {
+    toast('Catégorie déjà existante', '#e53935'); return;
+  }
+  const saved = await DB.addVehiculeCategory(nom, icon);
+  if (saved) {
+    toast(`Catégorie "${nom}" créée`);
+    document.getElementById('vtcat-new-name').value = '';
+    document.getElementById('vtcat-new-icon').value = '';
+    document.getElementById('addVtCatForm').style.display = 'none';
+    renderVehiculesPage();
+    refreshVehiculeSelects();
+    refreshCategorySelectsInForms();
   }
 });
 
@@ -1495,6 +1751,7 @@ async function startApp() {
   await DB.loadAll();
   refreshVehiculeSelects();
   refreshServiceSelects();
+  refreshCategorySelectsInForms();
   // Pré-remplit le montant pour la valeur par défaut du select Type
   const eType = document.getElementById('e-type');
   const eMontant = document.getElementById('e-montant');
