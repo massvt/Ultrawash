@@ -603,14 +603,35 @@ applyPreset('month');
 // ===== ENTREES =====
 function setDefaultDateTime() {
   const now = new Date();
-  document.getElementById('e-date').value = now.toISOString().slice(0, 10);
+  const today = ymd(now);
+  const eDate = document.getElementById('e-date');
+  eDate.value = today;
+  eDate.min = today;
   document.getElementById('e-heure').value = now.toTimeString().slice(0, 5);
-  document.getElementById('s-date').value = now.toISOString().slice(0, 10);
+  document.getElementById('s-date').value = today;
 }
 setDefaultDateTime();
 
 document.getElementById('formEntree').addEventListener('submit', async (ev) => {
   ev.preventDefault();
+
+  // Empêcher l'enregistrement d'une entrée dans le passé
+  const dateVal  = document.getElementById('e-date').value;
+  const heureVal = document.getElementById('e-heure').value;
+  const now = new Date();
+  const today = ymd(now);
+  if (dateVal < today) {
+    toast('Date antérieure interdite', '#e53935');
+    return;
+  }
+  if (dateVal === today) {
+    const nowHM = now.toTimeString().slice(0, 5);
+    if (heureVal < nowHM) {
+      toast('Heure antérieure interdite', '#e53935');
+      return;
+    }
+  }
+
   const plaque = (document.getElementById('e-plaque').value || '').trim().toUpperCase();
   let clientId   = document.getElementById('e-client-id').value || null;
   let vehiculeId = document.getElementById('e-vehicule-id').value || null;
