@@ -104,6 +104,17 @@ const DB = {
     return data;
   },
 
+  async updateService(nom, prix) {
+    const { data, error } = await sb.from('services')
+      .update({ prix, updated_at: new Date().toISOString() })
+      .eq('nom', nom).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.services.findIndex(s => s.nom === nom);
+    if (i !== -1) cache.services[i] = data;
+    PRIX[nom] = data.prix;
+    return data;
+  },
+
   async updateSortie(id, row) {
     const { data, error } = await sb.from('sorties').update(row).eq('id', id).select().single();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
@@ -213,6 +224,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.page === 'clients') renderClientsPage();
     if (btn.dataset.page === 'reservations') renderReservationsPage();
     if (btn.dataset.page === 'historique') renderHistorique();
+    if (btn.dataset.page === 'tarifs') renderTarifsPage();
     closeSidebar();
   });
 });
@@ -987,6 +999,41 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
   toast('Export CSV téléchargé');
 });
+
+// ===== TARIFS (admin patron) =====
+function renderTarifsPage() {
+  const tbody = document.getElementById('tarifsTable');
+  const services = DB.getServices().slice().sort((a, b) => a.ordre - b.ordre);
+  const ICONS = { Lavage: '🧼', Detailing: '✨', Entretien: '🔧' };
+  let lastCat = null;
+  tbody.innerHTML = services.map(s => {
+    const showCat = s.categorie !== lastCat;
+    lastCat = s.categorie;
+    return `
+      <tr data-nom="${escapeHtml(s.nom)}">
+        <td>${showCat ? `${ICONS[s.categorie] || ''} ${s.categorie}` : ''}</td>
+        <td>${escapeHtml(s.nom)}</td>
+        <td><input type="number" min="0" step="100" class="tarif-input" value="${s.prix}" /></td>
+        <td><button type="button" class="btn-outline tarif-save" title="Enregistrer">💾</button></td>
+      </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.tarif-save').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tr = btn.closest('tr');
+      const nom = tr.dataset.nom;
+      const input = tr.querySelector('.tarif-input');
+      const prix = Number(input.value);
+      if (!Number.isFinite(prix) || prix < 0) {
+        toast('Prix invalide', '#e53935'); return;
+      }
+      btn.disabled = true;
+      const saved = await DB.updateService(nom, prix);
+      btn.disabled = false;
+      if (saved) toast(`${nom} : ${fmt(prix)}`);
+    });
+  });
+}
 
 // ===== AUTH =====
 const loginScreen = document.getElementById('loginScreen');
