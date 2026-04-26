@@ -961,3 +961,81 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
   .tarif-name { flex-basis: 100%; }
   .tarif-input { flex: 1; width: auto; }
 }
+
+/* Toggle switch (actif/inactif) */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.switch input { display: none; }
+.switch .slider {
+  position: absolute; cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #cbd5e1;
+  border-radius: 22px;
+  transition: background .2s;
+}
+.switch .slider::before {
+  position: absolute; content: "";
+  height: 16px; width: 16px;
+  left: 3px; bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.switch input:checked + .slider { background: #0d9e6e; }
+.switch input:checked + .slider::before { transform: translateX(18px); }
+
+.tarif-row.inactive { opacity: .55; }
+.tarif-row.inactive .tarif-name { text-decoration: line-through; }
+.badge-off {
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: .7rem;
+  font-weight: 600;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.tarif-cat-select {
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: .85rem;
+  background: #fff;
+  cursor: pointer;
+}
+.tarif-cat-select:focus {
+  outline: none;
+  border-color: #0d9e6e;
+  box-shadow: 0 0 0 3px rgba(13,158,110,0.15);
+}
+
+/* Barre d'ajout (services / véhicules) */
+.vt-add-bar {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.vt-add-bar input,
+.vt-add-bar select {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: .95rem;
+}
+.vt-add-bar input[type="text"] { flex: 1; min-width: 180px; }
+.vt-add-bar input[type="number"] { width: 130px; }
+.vt-add-bar input:focus,
+.vt-add-bar select:focus {
+  outline: none;
+  border-color: #0d9e6e;
+  box-shadow: 0 0 0 3px rgba(13,158,110,0.15);
+}

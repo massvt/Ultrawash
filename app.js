@@ -8,15 +8,16 @@ const session = { user: null, role: null };
 const isPatron = () => session.role === 'patron';
 
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
-const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], clientsLoaded: false };
+const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], vehiculeTypes: [], clientsLoaded: false };
 
 // Map nom_service → prix (rempli au boot, utilisé pour pré-remplir le montant)
 const PRIX = {};
 
 const DB = {
-  getEntrees:  () => cache.entrees,
-  getSorties:  () => cache.sorties,
-  getServices: () => cache.services,
+  getEntrees:       () => cache.entrees,
+  getSorties:       () => cache.sorties,
+  getServices:      () => cache.services,
+  getVehiculeTypes: () => cache.vehiculeTypes,
 
   async loadAll() {
     const [
@@ -24,22 +25,53 @@ const DB = {
       { data: s,  error: se },
       { data: r,  error: re },
       { data: sv, error: sve },
+      { data: vt, error: vte },
     ] = await Promise.all([
       sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false }),
       sb.from('sorties').select('*').order('date', { ascending: false }),
       sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true }),
-      sb.from('services').select('*').eq('actif', true).order('ordre', { ascending: true }),
+      sb.from('services').select('*').order('ordre', { ascending: true }),
+      sb.from('vehicule_types').select('*').order('ordre', { ascending: true }),
     ]);
     if (ee)  console.error('entrees:', ee);
     if (se)  console.error('sorties:', se);
     if (re)  console.error('reservations:', re);
     if (sve) console.error('services:', sve);
-    cache.entrees      = e || [];
-    cache.sorties      = s || [];
-    cache.reservations = r || [];
-    cache.services     = sv || [];
+    if (vte) console.error('vehicule_types:', vte);
+    cache.entrees       = e || [];
+    cache.sorties       = s || [];
+    cache.reservations  = r || [];
+    cache.services      = sv || [];
+    cache.vehiculeTypes = vt || [];
     Object.keys(PRIX).forEach(k => delete PRIX[k]);
-    (sv || []).forEach(svc => { PRIX[svc.nom] = svc.prix; });
+    (sv || []).filter(s => s.actif).forEach(svc => { PRIX[svc.nom] = svc.prix; });
+  },
+
+  async addVehiculeType(nom) {
+    const next = (cache.vehiculeTypes.reduce((m, v) => Math.max(m, v.ordre), 0) || 0) + 10;
+    const { data, error } = await sb.from('vehicule_types')
+      .insert({ nom, ordre: next }).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.vehiculeTypes.push(data);
+    cache.vehiculeTypes.sort((a, b) => a.ordre - b.ordre);
+    return data;
+  },
+
+  async toggleVehiculeType(nom, actif) {
+    const { data, error } = await sb.from('vehicule_types')
+      .update({ actif, updated_at: new Date().toISOString() })
+      .eq('nom', nom).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.vehiculeTypes.findIndex(v => v.nom === nom);
+    if (i !== -1) cache.vehiculeTypes[i] = data;
+    return data;
+  },
+
+  async delVehiculeType(nom) {
+    const { error } = await sb.from('vehicule_types').delete().eq('nom', nom);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.vehiculeTypes = cache.vehiculeTypes.filter(v => v.nom !== nom);
+    return true;
   },
 
   getReservations: () => cache.reservations,
@@ -111,7 +143,39 @@ const DB = {
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
     const i = cache.services.findIndex(s => s.nom === nom);
     if (i !== -1) cache.services[i] = data;
-    PRIX[nom] = data.prix;
+    if (data.actif) PRIX[nom] = data.prix; else delete PRIX[nom];
+    return data;
+  },
+
+  async addService(nom, categorie, prix) {
+    const next = (cache.services.reduce((m, s) => Math.max(m, s.ordre), 0) || 0) + 10;
+    const { data, error } = await sb.from('services')
+      .insert({ nom, categorie, prix, ordre: next, actif: true }).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    cache.services.push(data);
+    cache.services.sort((a, b) => a.ordre - b.ordre);
+    PRIX[nom] = prix;
+    return data;
+  },
+
+  async toggleService(nom, actif) {
+    const { data, error } = await sb.from('services')
+      .update({ actif, updated_at: new Date().toISOString() })
+      .eq('nom', nom).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.services.findIndex(s => s.nom === nom);
+    if (i !== -1) cache.services[i] = data;
+    if (actif) PRIX[nom] = data.prix; else delete PRIX[nom];
+    return data;
+  },
+
+  async setServiceCategorie(nom, categorie) {
+    const { data, error } = await sb.from('services')
+      .update({ categorie, updated_at: new Date().toISOString() })
+      .eq('nom', nom).select().single();
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    const i = cache.services.findIndex(s => s.nom === nom);
+    if (i !== -1) cache.services[i] = data;
     return data;
   },
 
@@ -225,6 +289,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.page === 'reservations') renderReservationsPage();
     if (btn.dataset.page === 'historique') renderHistorique();
     if (btn.dataset.page === 'tarifs') renderTarifsPage();
+    if (btn.dataset.page === 'vehicules') renderVehiculesPage();
     closeSidebar();
   });
 });
@@ -282,23 +347,11 @@ function inToday(dateStr) {
 // ===== DASHBOARD =====
 let chartCA = null, chartTypes = null, chartCategories = null, chartVehicules = null, chartHeures = null, chartServiceCat = null;
 
-// Mapping libellé service → grande catégorie (pour stats dashboard)
-const SERVICE_CATEGORY = {
-  // Lavage
-  'Lavage Moto': 'Lavage', 'Lavage Moquette': 'Lavage', 'Lavage Standard': 'Lavage',
-  'Lavage Professionnel': 'Lavage', 'Lavage Complet': 'Lavage', 'Lavage Premium': 'Lavage',
-  'Autre Lavage': 'Lavage',
-  // Detailing
-  'Polissage': 'Detailing', 'Lustrage': 'Detailing', 'Protection Nano-céramique': 'Detailing',
-  'Film solaire & anti-UV': 'Detailing', 'Habillage / Covering': 'Detailing',
-  // Entretien rapide
-  'Changement pneus': 'Entretien', 'Réparation pneus': 'Entretien', 'Équilibrage': 'Entretien',
-  'Parallélisme': 'Entretien', 'Vidange': 'Entretien', 'Filtre à air': 'Entretien',
-  'Filtre à huile': 'Entretien', 'Filtre à gazoil': 'Entretien',
-  'Entretien climatisation': 'Entretien', 'Freins': 'Entretien',
-  'Reprogrammation calculateur': 'Entretien',
+// Catégorie d'un service (lookup dans cache.services, sinon 'Autre')
+const serviceCategory = (type) => {
+  const s = cache.services.find(x => x.nom === type);
+  return s ? s.categorie : 'Autre';
 };
-const serviceCategory = (type) => SERVICE_CATEGORY[type] || 'Autre';
 
 function getDashPeriodType() {
   // Pour le groupement du graphique CA vs Dépenses
@@ -1000,12 +1053,31 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   toast('Export CSV téléchargé');
 });
 
-// ===== TARIFS (admin patron) =====
+// ===== TARIFS / SERVICES (admin patron) =====
 const TARIF_CATS = [
   { key: 'Lavage',    icon: '🧼', label: 'Lavage' },
   { key: 'Detailing', icon: '✨', label: 'Detailing automobile' },
   { key: 'Entretien', icon: '🔧', label: 'Entretien rapide' },
 ];
+
+function refreshServiceSelects() {
+  const services = DB.getServices().filter(s => s.actif).slice().sort((a, b) => a.ordre - b.ordre);
+  const html = TARIF_CATS.map(cat => {
+    const items = services.filter(s => s.categorie === cat.key);
+    if (!items.length) return '';
+    return `<optgroup label="${cat.icon} ${cat.label}">${
+      items.map(s => `<option>${escapeHtml(s.nom)}</option>`).join('')
+    }</optgroup>`;
+  }).join('');
+  ['e-type', 'ed-type', 'r-type'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = html;
+    if (prev && services.some(s => s.nom === prev)) sel.value = prev;
+    else if (services.some(s => s.nom === 'Lavage Standard')) sel.value = 'Lavage Standard';
+  });
+}
 
 function renderTarifsPage() {
   const wrap = document.getElementById('tarifsAccordion');
@@ -1013,16 +1085,25 @@ function renderTarifsPage() {
 
   wrap.innerHTML = TARIF_CATS.map((cat, idx) => {
     const items = services.filter(s => s.categorie === cat.key);
-    if (!items.length) return '';
-    const rows = items.map(s => `
-      <div class="tarif-row" data-nom="${escapeHtml(s.nom)}">
-        <div class="tarif-name">${escapeHtml(s.nom)}</div>
+    const rows = items.map(s => {
+      const catOpts = TARIF_CATS.map(c =>
+        `<option value="${c.key}" ${c.key === s.categorie ? 'selected' : ''}>${c.icon} ${c.label}</option>`
+      ).join('');
+      return `
+      <div class="tarif-row ${s.actif ? '' : 'inactive'}" data-nom="${escapeHtml(s.nom)}">
+        <div class="tarif-name">${escapeHtml(s.nom)}${s.actif ? '' : ' <span class="badge-off">désactivé</span>'}</div>
         <div class="tarif-edit">
+          <select class="tarif-cat-select" title="Changer de catégorie">${catOpts}</select>
           <input type="number" min="0" step="100" class="tarif-input" value="${s.prix}" />
           <span class="tarif-currency">FCFA</span>
-          <button type="button" class="tarif-save" title="Enregistrer">💾</button>
+          <button type="button" class="tarif-save" title="Enregistrer le prix">💾</button>
+          <label class="switch" title="${s.actif ? 'Désactiver' : 'Activer'}">
+            <input type="checkbox" class="tarif-toggle" ${s.actif ? 'checked' : ''} />
+            <span class="slider"></span>
+          </label>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('') || '<div class="tarif-row" style="color:#94a3b8;font-style:italic">Aucun service dans cette catégorie</div>';
     return `
       <details class="tarif-cat tarif-cat-${cat.key.toLowerCase()}" ${idx === 0 ? 'open' : ''}>
         <summary>
@@ -1041,14 +1122,10 @@ function renderTarifsPage() {
       const nom = row.dataset.nom;
       const input = row.querySelector('.tarif-input');
       const prix = Number(input.value);
-      if (!Number.isFinite(prix) || prix < 0) {
-        toast('Prix invalide', '#e53935'); return;
-      }
-      btn.disabled = true;
-      btn.classList.add('saving');
+      if (!Number.isFinite(prix) || prix < 0) { toast('Prix invalide', '#e53935'); return; }
+      btn.disabled = true; btn.classList.add('saving');
       const saved = await DB.updateService(nom, prix);
-      btn.disabled = false;
-      btn.classList.remove('saving');
+      btn.disabled = false; btn.classList.remove('saving');
       if (saved) {
         row.classList.add('saved');
         setTimeout(() => row.classList.remove('saved'), 1200);
@@ -1056,7 +1133,161 @@ function renderTarifsPage() {
       }
     });
   });
+
+  wrap.querySelectorAll('.tarif-toggle').forEach(chk => {
+    chk.addEventListener('change', async () => {
+      const row = chk.closest('.tarif-row');
+      const nom = row.dataset.nom;
+      const saved = await DB.toggleService(nom, chk.checked);
+      if (saved) {
+        toast(`${nom} ${chk.checked ? 'activé' : 'désactivé'}`);
+        renderTarifsPage();
+        refreshServiceSelects();
+      } else {
+        chk.checked = !chk.checked;
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.tarif-cat-select').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const row = sel.closest('.tarif-row');
+      const nom = row.dataset.nom;
+      const saved = await DB.setServiceCategorie(nom, sel.value);
+      if (saved) {
+        toast(`${nom} déplacé en ${sel.value}`);
+        renderTarifsPage();
+        refreshServiceSelects();
+      }
+    });
+  });
 }
+
+// Bouton "+ Nouveau service" et formulaire d'ajout
+document.getElementById('btnAddService').addEventListener('click', () => {
+  const f = document.getElementById('addServiceForm');
+  f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+  if (f.style.display === 'flex') document.getElementById('svc-new-name').focus();
+});
+document.getElementById('svc-add-cancel').addEventListener('click', () => {
+  document.getElementById('addServiceForm').style.display = 'none';
+  document.getElementById('svc-new-name').value = '';
+  document.getElementById('svc-new-prix').value = '';
+});
+document.getElementById('svc-add-btn').addEventListener('click', async () => {
+  const nom = document.getElementById('svc-new-name').value.trim();
+  const cat = document.getElementById('svc-new-cat').value;
+  const prix = Number(document.getElementById('svc-new-prix').value);
+  if (!nom) { toast('Nom obligatoire', '#e53935'); return; }
+  if (DB.getServices().some(s => s.nom.toLowerCase() === nom.toLowerCase())) {
+    toast('Ce service existe déjà', '#e53935'); return;
+  }
+  if (!Number.isFinite(prix) || prix < 0) { toast('Prix invalide', '#e53935'); return; }
+  const saved = await DB.addService(nom, cat, prix);
+  if (saved) {
+    toast(`Service "${nom}" créé`);
+    document.getElementById('svc-new-name').value = '';
+    document.getElementById('svc-new-prix').value = '';
+    document.getElementById('addServiceForm').style.display = 'none';
+    renderTarifsPage();
+    refreshServiceSelects();
+  }
+});
+
+// ===== VÉHICULES (admin patron) =====
+function refreshVehiculeSelects() {
+  const all = DB.getVehiculeTypes().slice().sort((a, b) => a.ordre - b.ordre);
+  const actifs = all.filter(v => v.actif);
+  const htmlActifs = actifs.map(v => `<option value="${escapeHtml(v.nom)}">${escapeHtml(v.nom)}</option>`).join('');
+  ['e-vehicule', 'ed-vehicule', 'r-vehicule-type'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = htmlActifs;
+    if (prev && actifs.some(v => v.nom === prev)) sel.value = prev;
+  });
+  // Filtre historique : tous les types (même désactivés) pour les anciennes entrées
+  const fVeh = document.getElementById('f-vehicule');
+  if (fVeh) {
+    const prev = fVeh.value;
+    fVeh.innerHTML = '<option value="">Tous</option>' +
+      all.map(v => `<option value="${escapeHtml(v.nom)}">${escapeHtml(v.nom)}</option>`).join('');
+    fVeh.value = prev || '';
+  }
+}
+
+function renderVehiculesPage() {
+  const wrap = document.getElementById('vehiculesList');
+  const types = DB.getVehiculeTypes().slice().sort((a, b) => a.ordre - b.ordre);
+  if (!types.length) {
+    wrap.innerHTML = '<div class="tarif-row" style="color:#94a3b8;font-style:italic">Aucun type. Ajoutes-en un ci-dessus.</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <details class="tarif-cat" open>
+      <summary>
+        <span class="tarif-cat-icon">🚗</span>
+        <span class="tarif-cat-name">Types de véhicule</span>
+        <span class="tarif-cat-count">${types.length}</span>
+        <span class="tarif-cat-chevron">▾</span>
+      </summary>
+      <div class="tarif-list">
+        ${types.map(v => `
+          <div class="tarif-row ${v.actif ? '' : 'inactive'}" data-nom="${escapeHtml(v.nom)}">
+            <div class="tarif-name">${escapeHtml(v.nom)}${v.actif ? '' : ' <span class="badge-off">désactivé</span>'}</div>
+            <div class="tarif-edit">
+              <label class="switch" title="${v.actif ? 'Désactiver' : 'Activer'}">
+                <input type="checkbox" class="vt-toggle" ${v.actif ? 'checked' : ''} />
+                <span class="slider"></span>
+              </label>
+              <button type="button" class="tarif-save vt-del" title="Supprimer définitivement" style="background:#dc2626">🗑️</button>
+            </div>
+          </div>`).join('')}
+      </div>
+    </details>`;
+
+  wrap.querySelectorAll('.vt-toggle').forEach(chk => {
+    chk.addEventListener('change', async () => {
+      const nom = chk.closest('.tarif-row').dataset.nom;
+      const saved = await DB.toggleVehiculeType(nom, chk.checked);
+      if (saved) {
+        toast(`${nom} ${chk.checked ? 'activé' : 'désactivé'}`);
+        renderVehiculesPage();
+        refreshVehiculeSelects();
+      } else {
+        chk.checked = !chk.checked;
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.vt-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const nom = btn.closest('.tarif-row').dataset.nom;
+      if (!confirm(`Supprimer définitivement "${nom}" ?\n(préfère désactiver si des entrées y font référence)`)) return;
+      const ok = await DB.delVehiculeType(nom);
+      if (ok) {
+        toast(`${nom} supprimé`);
+        renderVehiculesPage();
+        refreshVehiculeSelects();
+      }
+    });
+  });
+}
+
+document.getElementById('vt-add-btn').addEventListener('click', async () => {
+  const nom = document.getElementById('vt-new-name').value.trim();
+  if (!nom) { toast('Nom obligatoire', '#e53935'); return; }
+  if (DB.getVehiculeTypes().some(v => v.nom.toLowerCase() === nom.toLowerCase())) {
+    toast('Ce type existe déjà', '#e53935'); return;
+  }
+  const saved = await DB.addVehiculeType(nom);
+  if (saved) {
+    toast(`Type "${nom}" ajouté`);
+    document.getElementById('vt-new-name').value = '';
+    renderVehiculesPage();
+    refreshVehiculeSelects();
+  }
+});
 
 // ===== AUTH =====
 const loginScreen = document.getElementById('loginScreen');
@@ -1108,6 +1339,8 @@ async function startApp() {
   document.body.classList.remove('auth-loading');
   document.body.classList.add('authed');
   await DB.loadAll();
+  refreshVehiculeSelects();
+  refreshServiceSelects();
   // Pré-remplit le montant pour la valeur par défaut du select Type
   const eType = document.getElementById('e-type');
   const eMontant = document.getElementById('e-montant');

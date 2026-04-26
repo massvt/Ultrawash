@@ -58,7 +58,10 @@
         <span class="icon">📋</span> Historique
       </button>
       <button class="nav-btn patron-only" data-page="tarifs">
-        <span class="icon">💰</span> Tarifs
+        <span class="icon">💰</span> Services & Tarifs
+      </button>
+      <button class="nav-btn patron-only" data-page="vehicules">
+        <span class="icon">🚗</span> Véhicules
       </button>
     </nav>
     <div class="sidebar-footer">
@@ -202,48 +205,11 @@
           <div class="form-row">
             <div class="form-group">
               <label>Type de véhicule</label>
-              <select id="e-vehicule">
-                <option value="Voiture">Voiture</option>
-                <option value="Moto">Moto</option>
-                <option value="SUV/4x4">SUV / 4x4</option>
-                <option value="Camionnette">Camionnette</option>
-                <option value="Bus/Camion">Bus / Camion</option>
-                <option value="Autre">Autre</option>
-              </select>
+              <select id="e-vehicule"></select>
             </div>
             <div class="form-group">
               <label>Type de service</label>
-              <select id="e-type">
-                <optgroup label="🧼 Lavage">
-                  <option>Lavage Moto</option>
-                  <option>Lavage Moquette</option>
-                  <option selected>Lavage Standard</option>
-                  <option>Lavage Professionnel</option>
-                  <option>Lavage Complet</option>
-                  <option>Lavage Premium</option>
-                  <option>Autre Lavage</option>
-                </optgroup>
-                <optgroup label="✨ Detailing automobile">
-                  <option>Polissage</option>
-                  <option>Lustrage</option>
-                  <option>Protection Nano-céramique</option>
-                  <option>Film solaire &amp; anti-UV</option>
-                  <option>Habillage / Covering</option>
-                </optgroup>
-                <optgroup label="🔧 Entretien rapide">
-                  <option>Changement pneus</option>
-                  <option>Réparation pneus</option>
-                  <option>Équilibrage</option>
-                  <option>Parallélisme</option>
-                  <option>Vidange</option>
-                  <option>Filtre à air</option>
-                  <option>Filtre à huile</option>
-                  <option>Filtre à gazoil</option>
-                  <option>Entretien climatisation</option>
-                  <option>Freins</option>
-                  <option>Reprogrammation calculateur</option>
-                </optgroup>
-              </select>
+              <select id="e-type"></select>
             </div>
           </div>
           <div class="form-row">
@@ -517,13 +483,40 @@
       <div id="historiqueEmpty" class="empty-state">Aucune opération trouvée.</div>
     </section>
 
-    <!-- TARIFS (patron only) -->
+    <!-- SERVICES & TARIFS (patron only) -->
     <section id="page-tarifs" class="page">
       <header class="page-header">
-        <h1>Tarifs des services</h1>
+        <h1>Services & Tarifs</h1>
+        <div class="header-actions">
+          <button class="btn-primary" id="btnAddService">+ Nouveau service</button>
+        </div>
       </header>
-      <p class="tarifs-hint">Modifie le prix d'un service puis clique sur 💾. Le nouveau tarif sera utilisé pour les prochaines entrées (les entrées passées ne sont pas affectées).</p>
+      <p class="tarifs-hint">Modifie le prix puis clique sur 💾. Désactive un service obsolète avec le toggle (il ne sera plus proposé à la saisie). Les entrées passées ne sont pas affectées.</p>
+      <div id="addServiceForm" class="vt-add-bar" style="display:none">
+        <input type="text" id="svc-new-name" placeholder="Nom du service" maxlength="50" />
+        <select id="svc-new-cat">
+          <option value="Lavage">🧼 Lavage</option>
+          <option value="Detailing">✨ Detailing</option>
+          <option value="Entretien">🔧 Entretien</option>
+        </select>
+        <input type="number" id="svc-new-prix" min="0" step="100" placeholder="Prix FCFA" />
+        <button class="btn-primary" id="svc-add-btn">Créer</button>
+        <button class="btn-outline" id="svc-add-cancel">Annuler</button>
+      </div>
       <div id="tarifsAccordion" class="tarifs-accordion"></div>
+    </section>
+
+    <!-- VÉHICULES (patron only) -->
+    <section id="page-vehicules" class="page">
+      <header class="page-header">
+        <h1>Types de véhicule</h1>
+      </header>
+      <p class="tarifs-hint">Gère la liste des types de véhicule proposés à la saisie. Désactive un type au lieu de le supprimer si des entrées y font référence.</p>
+      <div class="vt-add-bar">
+        <input type="text" id="vt-new-name" placeholder="Nouveau type (ex: Quad)" maxlength="40" />
+        <button class="btn-primary" id="vt-add-btn">+ Ajouter</button>
+      </div>
+      <div id="vehiculesList" class="tarifs-accordion"></div>
     </section>
 
   </main>
@@ -554,48 +547,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>Type de véhicule</label>
-            <select id="ed-vehicule">
-              <option value="Voiture">Voiture</option>
-              <option value="Moto">Moto</option>
-              <option value="SUV/4x4">SUV / 4x4</option>
-              <option value="Camionnette">Camionnette</option>
-              <option value="Bus/Camion">Bus / Camion</option>
-              <option value="Autre">Autre</option>
-            </select>
+            <select id="ed-vehicule"></select>
           </div>
           <div class="form-group">
             <label>Type de service</label>
-            <select id="ed-type">
-              <optgroup label="🧼 Lavage">
-                <option>Lavage Moto</option>
-                <option>Lavage Moquette</option>
-                <option>Lavage Standard</option>
-                <option>Lavage Professionnel</option>
-                <option>Lavage Complet</option>
-                <option>Lavage Premium</option>
-                <option>Autre Lavage</option>
-              </optgroup>
-              <optgroup label="✨ Detailing automobile">
-                <option>Polissage</option>
-                <option>Lustrage</option>
-                <option>Protection Nano-céramique</option>
-                <option>Film solaire &amp; anti-UV</option>
-                <option>Habillage / Covering</option>
-              </optgroup>
-              <optgroup label="🔧 Entretien rapide">
-                <option>Changement pneus</option>
-                <option>Réparation pneus</option>
-                <option>Équilibrage</option>
-                <option>Parallélisme</option>
-                <option>Vidange</option>
-                <option>Filtre à air</option>
-                <option>Filtre à huile</option>
-                <option>Filtre à gazoil</option>
-                <option>Entretien climatisation</option>
-                <option>Freins</option>
-                <option>Reprogrammation calculateur</option>
-              </optgroup>
-            </select>
+            <select id="ed-type"></select>
           </div>
         </div>
         <div class="form-row">
@@ -792,14 +748,7 @@
             </div>
             <div class="form-group">
               <label>Type de véhicule</label>
-              <select id="r-vehicule-type">
-                <option value="Voiture">Voiture</option>
-                <option value="Moto">Moto</option>
-                <option value="SUV/4x4">SUV / 4x4</option>
-                <option value="Camionnette">Camionnette</option>
-                <option value="Bus/Camion">Bus / Camion</option>
-                <option value="Autre">Autre</option>
-              </select>
+              <select id="r-vehicule-type"></select>
             </div>
           </div>
         </div>
@@ -818,37 +767,7 @@
         <div class="form-row">
           <div class="form-group">
             <label>Type de service</label>
-            <select id="r-type">
-              <optgroup label="🧼 Lavage">
-                <option>Lavage Moto</option>
-                <option>Lavage Moquette</option>
-                <option selected>Lavage Standard</option>
-                <option>Lavage Professionnel</option>
-                <option>Lavage Complet</option>
-                <option>Lavage Premium</option>
-                <option>Autre Lavage</option>
-              </optgroup>
-              <optgroup label="✨ Detailing automobile">
-                <option>Polissage</option>
-                <option>Lustrage</option>
-                <option>Protection Nano-céramique</option>
-                <option>Film solaire &amp; anti-UV</option>
-                <option>Habillage / Covering</option>
-              </optgroup>
-              <optgroup label="🔧 Entretien rapide">
-                <option>Changement pneus</option>
-                <option>Réparation pneus</option>
-                <option>Équilibrage</option>
-                <option>Parallélisme</option>
-                <option>Vidange</option>
-                <option>Filtre à air</option>
-                <option>Filtre à huile</option>
-                <option>Filtre à gazoil</option>
-                <option>Entretien climatisation</option>
-                <option>Freins</option>
-                <option>Reprogrammation calculateur</option>
-              </optgroup>
-            </select>
+            <select id="r-type"></select>
           </div>
           <div class="form-group">
             <label>Montant estimé (FCFA)</label>
