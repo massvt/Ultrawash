@@ -916,6 +916,20 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .tarif-row:first-child { border-top: 0; }
 .tarif-row:hover { background: #fafbfc; }
 .tarif-row.saved { background: #d1fae5; }
+.tarif-row.dragging { opacity: .35; background: #e0f2fe; }
+.tarif-handle {
+  color: #cbd5e1;
+  cursor: grab;
+  user-select: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  letter-spacing: -2px;
+  flex-shrink: 0;
+  transition: color .15s;
+}
+.tarif-row:hover .tarif-handle { color: #64748b; }
+.tarif-handle:active { cursor: grabbing; }
 .tarif-name {
   flex: 1;
   color: #1e293b;

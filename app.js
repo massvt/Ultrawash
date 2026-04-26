@@ -1122,7 +1122,8 @@ function renderTarifsPage() {
         `<option value="${c.key}" ${c.key === s.categorie ? 'selected' : ''}>${c.icon} ${c.label}</option>`
       ).join('');
       return `
-      <div class="tarif-row ${s.actif ? '' : 'inactive'}" data-nom="${escapeHtml(s.nom)}">
+      <div class="tarif-row ${s.actif ? '' : 'inactive'}" data-nom="${escapeHtml(s.nom)}" draggable="true">
+        <span class="tarif-handle" title="Glisser pour réordonner">⋮⋮</span>
         <div class="tarif-name">
           <span class="tarif-name-text">${escapeHtml(s.nom)}</span>${s.actif ? '' : ' <span class="badge-off">désactivé</span>'}
           <button type="button" class="tarif-rename" title="Renommer">✏️</button>
@@ -1195,6 +1196,23 @@ function renderTarifsPage() {
         renderTarifsPage();
         refreshServiceSelects();
       }
+    });
+  });
+
+  // Drag & drop pour réordonner les services (intra-catégorie)
+  wrap.querySelectorAll('.tarif-list').forEach(list => {
+    attachDragSort(list, async () => {
+      const rows = wrap.querySelectorAll('.tarif-row[data-nom]');
+      const updates = [...rows].map((r, i) => ({ nom: r.dataset.nom, ordre: (i + 1) * 10 }));
+      await Promise.all(updates.map(u =>
+        sb.from('services').update({ ordre: u.ordre }).eq('nom', u.nom)
+      ));
+      updates.forEach(u => {
+        const s = cache.services.find(x => x.nom === u.nom);
+        if (s) s.ordre = u.ordre;
+      });
+      refreshServiceSelects();
+      toast('Ordre mis à jour');
     });
   });
 
@@ -1282,7 +1300,8 @@ function renderVehiculesPage() {
       </summary>
       <div class="tarif-list">
         ${types.map(v => `
-          <div class="tarif-row ${v.actif ? '' : 'inactive'}" data-nom="${escapeHtml(v.nom)}">
+          <div class="tarif-row ${v.actif ? '' : 'inactive'}" data-nom="${escapeHtml(v.nom)}" draggable="true">
+            <span class="tarif-handle" title="Glisser pour réordonner">⋮⋮</span>
             <div class="tarif-name">
               <span class="tarif-name-text">${escapeHtml(v.nom)}</span>${v.actif ? '' : ' <span class="badge-off">désactivé</span>'}
               <button type="button" class="tarif-rename vt-rename" title="Renommer">✏️</button>
@@ -1336,6 +1355,53 @@ function renderVehiculesPage() {
         renderVehiculesPage();
         refreshVehiculeSelects();
       }
+    });
+  });
+
+  // Drag & drop pour réordonner les types
+  wrap.querySelectorAll('.tarif-list').forEach(list => {
+    attachDragSort(list, async () => {
+      const rows = wrap.querySelectorAll('.tarif-row[data-nom]');
+      const updates = [...rows].map((r, i) => ({ nom: r.dataset.nom, ordre: (i + 1) * 10 }));
+      await Promise.all(updates.map(u =>
+        sb.from('vehicule_types').update({ ordre: u.ordre }).eq('nom', u.nom)
+      ));
+      updates.forEach(u => {
+        const v = cache.vehiculeTypes.find(x => x.nom === u.nom);
+        if (v) v.ordre = u.ordre;
+      });
+      refreshVehiculeSelects();
+      toast('Ordre mis à jour');
+    });
+  });
+}
+
+// Helper drag & drop : glisser pour réordonner les .tarif-row dans un container.
+// onReorder() est appelé une fois après le drop.
+function attachDragSort(container, onReorder) {
+  let dragRow = null;
+  container.querySelectorAll('.tarif-row[draggable="true"]').forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      dragRow = row;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', row.dataset.nom);
+      setTimeout(() => row.classList.add('dragging'), 0);
+    });
+    row.addEventListener('dragend', async () => {
+      row.classList.remove('dragging');
+      const moved = dragRow != null;
+      dragRow = null;
+      if (moved) await onReorder();
+    });
+    row.addEventListener('dragover', (e) => {
+      if (!dragRow || dragRow === row) return;
+      // Drag intra-liste seulement (évite de mélanger les catégories)
+      if (dragRow.parentNode !== row.parentNode) return;
+      e.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      if (after) row.parentNode.insertBefore(dragRow, row.nextSibling);
+      else row.parentNode.insertBefore(dragRow, row);
     });
   });
 }
