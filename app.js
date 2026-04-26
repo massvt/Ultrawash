@@ -8,28 +8,38 @@ const session = { user: null, role: null };
 const isPatron = () => session.role === 'patron';
 
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
-const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], clientsLoaded: false };
+const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], clientsLoaded: false };
+
+// Map nom_service → prix (rempli au boot, utilisé pour pré-remplir le montant)
+const PRIX = {};
 
 const DB = {
-  getEntrees: () => cache.entrees,
-  getSorties: () => cache.sorties,
+  getEntrees:  () => cache.entrees,
+  getSorties:  () => cache.sorties,
+  getServices: () => cache.services,
 
   async loadAll() {
     const [
       { data: e,  error: ee },
       { data: s,  error: se },
       { data: r,  error: re },
+      { data: sv, error: sve },
     ] = await Promise.all([
       sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false }),
       sb.from('sorties').select('*').order('date', { ascending: false }),
       sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true }),
+      sb.from('services').select('*').eq('actif', true).order('ordre', { ascending: true }),
     ]);
-    if (ee) console.error('entrees:', ee);
-    if (se) console.error('sorties:', se);
-    if (re) console.error('reservations:', re);
+    if (ee)  console.error('entrees:', ee);
+    if (se)  console.error('sorties:', se);
+    if (re)  console.error('reservations:', re);
+    if (sve) console.error('services:', sve);
     cache.entrees      = e || [];
     cache.sorties      = s || [];
     cache.reservations = r || [];
+    cache.services     = sv || [];
+    Object.keys(PRIX).forEach(k => delete PRIX[k]);
+    (sv || []).forEach(svc => { PRIX[svc.nom] = svc.prix; });
   },
 
   getReservations: () => cache.reservations,
@@ -634,6 +644,21 @@ document.getElementById('formEntree').addEventListener('submit', async (ev) => {
   toast('Lavage enregistré !');
 });
 
+// Pré-remplissage du montant depuis le catalogue de tarifs.
+// L'utilisateur peut toujours écraser la valeur après coup.
+function bindPrixAuto(typeSelectId, montantInputId) {
+  const sel = document.getElementById(typeSelectId);
+  const inp = document.getElementById(montantInputId);
+  if (!sel || !inp) return;
+  sel.addEventListener('change', () => {
+    const prix = PRIX[sel.value];
+    if (prix != null && prix > 0) inp.value = prix;
+  });
+}
+bindPrixAuto('e-type',  'e-montant');
+bindPrixAuto('ed-type', 'ed-montant');
+bindPrixAuto('r-type',  'r-montant');
+
 // Auto-rattachement par plaque (debounced)
 let plaqueLookupTimer = null;
 document.getElementById('e-plaque').addEventListener('input', (ev) => {
@@ -992,6 +1017,13 @@ async function startApp() {
   document.body.classList.remove('auth-loading');
   document.body.classList.add('authed');
   await DB.loadAll();
+  // Pré-remplit le montant pour la valeur par défaut du select Type
+  const eType = document.getElementById('e-type');
+  const eMontant = document.getElementById('e-montant');
+  if (eType && eMontant && !eMontant.value) {
+    const p = PRIX[eType.value];
+    if (p != null && p > 0) eMontant.value = p;
+  }
   // Page de démarrage selon le rôle
   if (isPatron()) {
     goToPage('dashboard');
