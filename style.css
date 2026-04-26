@@ -836,3 +836,128 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .resa-veh-pick { flex-basis: 100%; margin-top: 4px; }
 .resa-veh-pick label { display: flex; gap: 8px; align-items: center; font-size: .85rem; }
 .resa-veh-pick select { flex: 1; }
+
+/* ===== TARIFS (page admin) ===== */
+.tarifs-hint {
+  color: #64748b;
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tarifs-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.tarif-cat {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+  transition: box-shadow .2s;
+}
+.tarif-cat[open] {
+  box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+}
+.tarif-cat > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-weight: 600;
+  user-select: none;
+  background: linear-gradient(180deg,#f8fafc,#f1f5f9);
+  border-bottom: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.tarif-cat[open] > summary {
+  border-bottom-color: #e2e8f0;
+  background: linear-gradient(180deg,#f1f5f9,#e2e8f0);
+}
+.tarif-cat > summary::-webkit-details-marker { display: none; }
+.tarif-cat > summary:hover { background: #eef2f7; }
+.tarif-cat-icon { font-size: 22px; line-height: 1; }
+.tarif-cat-name { flex: 1; font-size: 1.05rem; color: #0f172a; }
+.tarif-cat-count {
+  background: #0d9e6e;
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.tarif-cat-chevron {
+  color: #64748b;
+  transition: transform .2s;
+  font-size: 14px;
+}
+.tarif-cat[open] .tarif-cat-chevron { transform: rotate(180deg); }
+.tarif-cat-detailing .tarif-cat-count { background: #6366f1; }
+.tarif-cat-entretien .tarif-cat-count { background: #f59e0b; }
+.tarif-list {
+  display: flex;
+  flex-direction: column;
+}
+.tarif-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid #f1f5f9;
+  transition: background .25s;
+}
+.tarif-row:first-child { border-top: 0; }
+.tarif-row:hover { background: #fafbfc; }
+.tarif-row.saved { background: #d1fae5; }
+.tarif-name {
+  flex: 1;
+  color: #1e293b;
+  font-size: .95rem;
+}
+.tarif-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tarif-input {
+  width: 110px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: .95rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  transition: border-color .15s, box-shadow .15s;
+}
+.tarif-input:focus {
+  outline: none;
+  border-color: #0d9e6e;
+  box-shadow: 0 0 0 3px rgba(13,158,110,0.15);
+}
+.tarif-currency {
+  color: #94a3b8;
+  font-size: .8rem;
+  font-weight: 500;
+}
+.tarif-save {
+  background: #0d9e6e;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background .15s, transform .1s;
+}
+.tarif-save:hover { background: #0b8a60; }
+.tarif-save:active { transform: scale(.94); }
+.tarif-save:disabled { opacity: .6; cursor: wait; }
+.tarif-save.saving { background: #64748b; }
+@media (max-width: 540px) {
+  .tarif-row { flex-wrap: wrap; }
+  .tarif-name { flex-basis: 100%; }
+  .tarif-input { flex: 1; width: auto; }
+}

@@ -1001,36 +1001,59 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 });
 
 // ===== TARIFS (admin patron) =====
+const TARIF_CATS = [
+  { key: 'Lavage',    icon: '🧼', label: 'Lavage' },
+  { key: 'Detailing', icon: '✨', label: 'Detailing automobile' },
+  { key: 'Entretien', icon: '🔧', label: 'Entretien rapide' },
+];
+
 function renderTarifsPage() {
-  const tbody = document.getElementById('tarifsTable');
+  const wrap = document.getElementById('tarifsAccordion');
   const services = DB.getServices().slice().sort((a, b) => a.ordre - b.ordre);
-  const ICONS = { Lavage: '🧼', Detailing: '✨', Entretien: '🔧' };
-  let lastCat = null;
-  tbody.innerHTML = services.map(s => {
-    const showCat = s.categorie !== lastCat;
-    lastCat = s.categorie;
+
+  wrap.innerHTML = TARIF_CATS.map((cat, idx) => {
+    const items = services.filter(s => s.categorie === cat.key);
+    if (!items.length) return '';
+    const rows = items.map(s => `
+      <div class="tarif-row" data-nom="${escapeHtml(s.nom)}">
+        <div class="tarif-name">${escapeHtml(s.nom)}</div>
+        <div class="tarif-edit">
+          <input type="number" min="0" step="100" class="tarif-input" value="${s.prix}" />
+          <span class="tarif-currency">FCFA</span>
+          <button type="button" class="tarif-save" title="Enregistrer">💾</button>
+        </div>
+      </div>`).join('');
     return `
-      <tr data-nom="${escapeHtml(s.nom)}">
-        <td>${showCat ? `${ICONS[s.categorie] || ''} ${s.categorie}` : ''}</td>
-        <td>${escapeHtml(s.nom)}</td>
-        <td><input type="number" min="0" step="100" class="tarif-input" value="${s.prix}" /></td>
-        <td><button type="button" class="btn-outline tarif-save" title="Enregistrer">💾</button></td>
-      </tr>`;
+      <details class="tarif-cat tarif-cat-${cat.key.toLowerCase()}" ${idx === 0 ? 'open' : ''}>
+        <summary>
+          <span class="tarif-cat-icon">${cat.icon}</span>
+          <span class="tarif-cat-name">${cat.label}</span>
+          <span class="tarif-cat-count">${items.length}</span>
+          <span class="tarif-cat-chevron">▾</span>
+        </summary>
+        <div class="tarif-list">${rows}</div>
+      </details>`;
   }).join('');
 
-  tbody.querySelectorAll('.tarif-save').forEach(btn => {
+  wrap.querySelectorAll('.tarif-save').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const tr = btn.closest('tr');
-      const nom = tr.dataset.nom;
-      const input = tr.querySelector('.tarif-input');
+      const row = btn.closest('.tarif-row');
+      const nom = row.dataset.nom;
+      const input = row.querySelector('.tarif-input');
       const prix = Number(input.value);
       if (!Number.isFinite(prix) || prix < 0) {
         toast('Prix invalide', '#e53935'); return;
       }
       btn.disabled = true;
+      btn.classList.add('saving');
       const saved = await DB.updateService(nom, prix);
       btn.disabled = false;
-      if (saved) toast(`${nom} : ${fmt(prix)}`);
+      btn.classList.remove('saving');
+      if (saved) {
+        row.classList.add('saved');
+        setTimeout(() => row.classList.remove('saved'), 1200);
+        toast(`${nom} : ${fmt(prix)}`);
+      }
     });
   });
 }
