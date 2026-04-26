@@ -920,7 +920,28 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
   flex: 1;
   color: #1e293b;
   font-size: .95rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
+.tarif-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tarif-rename {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: .9rem;
+  opacity: .35;
+  transition: opacity .15s, background .15s;
+}
+.tarif-row:hover .tarif-rename { opacity: .85; }
+.tarif-rename:hover { background: #f1f5f9; opacity: 1; }
 .tarif-edit {
   display: flex;
   align-items: center;

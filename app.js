@@ -169,6 +169,38 @@ const DB = {
     return data;
   },
 
+  async renameService(oldNom, newNom) {
+    if (oldNom === newNom) return false;
+    if (cache.services.some(s => s.nom.toLowerCase() === newNom.toLowerCase())) {
+      toast('Un service porte déjà ce nom', '#e53935'); return false;
+    }
+    const { error: e1 } = await sb.from('services')
+      .update({ nom: newNom, updated_at: new Date().toISOString() }).eq('nom', oldNom);
+    if (e1) { toast('Erreur : ' + e1.message, '#e53935'); return false; }
+    const { error: e2 } = await sb.from('entrees').update({ type: newNom }).eq('type', oldNom);
+    if (e2) { toast('Renommé en base mais entrées non propagées : ' + e2.message, '#e53935'); }
+    const { error: e3 } = await sb.from('reservations').update({ type_lavage: newNom }).eq('type_lavage', oldNom);
+    if (e3) { toast('Renommé mais résa non propagées : ' + e3.message, '#e53935'); }
+    await DB.loadAll();
+    return true;
+  },
+
+  async renameVehiculeType(oldNom, newNom) {
+    if (oldNom === newNom) return false;
+    if (cache.vehiculeTypes.some(v => v.nom.toLowerCase() === newNom.toLowerCase())) {
+      toast('Un type porte déjà ce nom', '#e53935'); return false;
+    }
+    const { error: e1 } = await sb.from('vehicule_types')
+      .update({ nom: newNom, updated_at: new Date().toISOString() }).eq('nom', oldNom);
+    if (e1) { toast('Erreur : ' + e1.message, '#e53935'); return false; }
+    const { error: e2 } = await sb.from('entrees').update({ vehicule: newNom }).eq('vehicule', oldNom);
+    if (e2) { toast('Renommé en base mais entrées non propagées : ' + e2.message, '#e53935'); }
+    const { error: e3 } = await sb.from('reservations').update({ vehicule_type: newNom }).eq('vehicule_type', oldNom);
+    if (e3) { toast('Renommé mais résa non propagées : ' + e3.message, '#e53935'); }
+    await DB.loadAll();
+    return true;
+  },
+
   async setServiceCategorie(nom, categorie) {
     const { data, error } = await sb.from('services')
       .update({ categorie, updated_at: new Date().toISOString() })
@@ -1091,7 +1123,10 @@ function renderTarifsPage() {
       ).join('');
       return `
       <div class="tarif-row ${s.actif ? '' : 'inactive'}" data-nom="${escapeHtml(s.nom)}">
-        <div class="tarif-name">${escapeHtml(s.nom)}${s.actif ? '' : ' <span class="badge-off">désactivé</span>'}</div>
+        <div class="tarif-name">
+          <span class="tarif-name-text">${escapeHtml(s.nom)}</span>${s.actif ? '' : ' <span class="badge-off">désactivé</span>'}
+          <button type="button" class="tarif-rename" title="Renommer">✏️</button>
+        </div>
         <div class="tarif-edit">
           <select class="tarif-cat-select" title="Changer de catégorie">${catOpts}</select>
           <input type="number" min="0" step="100" class="tarif-input" value="${s.prix}" />
@@ -1145,6 +1180,20 @@ function renderTarifsPage() {
         refreshServiceSelects();
       } else {
         chk.checked = !chk.checked;
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.tarif-rename').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const oldNom = btn.closest('.tarif-row').dataset.nom;
+      const newNom = (prompt('Nouveau nom du service :', oldNom) || '').trim();
+      if (!newNom || newNom === oldNom) return;
+      const ok = await DB.renameService(oldNom, newNom);
+      if (ok) {
+        toast(`"${oldNom}" → "${newNom}"`);
+        renderTarifsPage();
+        refreshServiceSelects();
       }
     });
   });
@@ -1234,7 +1283,10 @@ function renderVehiculesPage() {
       <div class="tarif-list">
         ${types.map(v => `
           <div class="tarif-row ${v.actif ? '' : 'inactive'}" data-nom="${escapeHtml(v.nom)}">
-            <div class="tarif-name">${escapeHtml(v.nom)}${v.actif ? '' : ' <span class="badge-off">désactivé</span>'}</div>
+            <div class="tarif-name">
+              <span class="tarif-name-text">${escapeHtml(v.nom)}</span>${v.actif ? '' : ' <span class="badge-off">désactivé</span>'}
+              <button type="button" class="tarif-rename vt-rename" title="Renommer">✏️</button>
+            </div>
             <div class="tarif-edit">
               <label class="switch" title="${v.actif ? 'Désactiver' : 'Activer'}">
                 <input type="checkbox" class="vt-toggle" ${v.actif ? 'checked' : ''} />
@@ -1256,6 +1308,20 @@ function renderVehiculesPage() {
         refreshVehiculeSelects();
       } else {
         chk.checked = !chk.checked;
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.vt-rename').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const oldNom = btn.closest('.tarif-row').dataset.nom;
+      const newNom = (prompt('Nouveau nom du type de véhicule :', oldNom) || '').trim();
+      if (!newNom || newNom === oldNom) return;
+      const ok = await DB.renameVehiculeType(oldNom, newNom);
+      if (ok) {
+        toast(`"${oldNom}" → "${newNom}"`);
+        renderVehiculesPage();
+        refreshVehiculeSelects();
       }
     });
   });
