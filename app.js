@@ -201,6 +201,14 @@ const DB = {
     return true;
   },
 
+  async delService(nom) {
+    const { error } = await sb.from('services').delete().eq('nom', nom);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    cache.services = cache.services.filter(s => s.nom !== nom);
+    delete PRIX[nom];
+    return true;
+  },
+
   async setServiceCategorie(nom, categorie) {
     const { data, error } = await sb.from('services')
       .update({ categorie, updated_at: new Date().toISOString() })
@@ -1137,6 +1145,7 @@ function renderTarifsPage() {
             <input type="checkbox" class="tarif-toggle" ${s.actif ? 'checked' : ''} />
             <span class="slider"></span>
           </label>
+          <button type="button" class="tarif-save svc-del" title="Supprimer définitivement" style="background:#dc2626">🗑️</button>
         </div>
       </div>`;
     }).join('') || '<div class="tarif-row" style="color:#94a3b8;font-style:italic">Aucun service dans cette catégorie</div>';
@@ -1193,6 +1202,19 @@ function renderTarifsPage() {
       const ok = await DB.renameService(oldNom, newNom);
       if (ok) {
         toast(`"${oldNom}" → "${newNom}"`);
+        renderTarifsPage();
+        refreshServiceSelects();
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.svc-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const nom = btn.closest('.tarif-row').dataset.nom;
+      if (!confirm(`Supprimer définitivement "${nom}" ?\nL'historique des entrées et réservations conservera ce libellé. Préfère désactiver si tu veux pouvoir réutiliser ce service plus tard.`)) return;
+      const ok = await DB.delService(nom);
+      if (ok) {
+        toast(`${nom} supprimé`);
         renderTarifsPage();
         refreshServiceSelects();
       }
