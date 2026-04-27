@@ -1842,8 +1842,15 @@ logoutBtn.addEventListener('click', async () => {
 
 // ===== UTILISATEURS (super_admin only) =====
 async function callManageUsers(action, body = {}) {
+  const { data: { session: s } } = await sb.auth.getSession();
+  const token = s?.access_token;
+  if (!token) {
+    toast('Session expirée, reconnecte-toi.', '#e53935');
+    return null;
+  }
   const { data, error } = await sb.functions.invoke('manage-users', {
-    body: { action, ...body }
+    body: { action, ...body },
+    headers: { Authorization: `Bearer ${token}` }
   });
   if (error) {
     let msg = error.message || 'Erreur réseau';
