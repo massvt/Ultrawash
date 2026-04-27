@@ -1414,7 +1414,22 @@ document.getElementById('svc-add-btn').addEventListener('click', async () => {
 function refreshVehiculeSelects() {
   const all = DB.getVehiculeTypes().slice().sort((a, b) => a.ordre - b.ordre);
   const actifs = all.filter(v => v.actif);
-  const htmlActifs = actifs.map(v => `<option value="${escapeHtml(v.nom)}">${escapeHtml(v.nom)}</option>`).join('');
+  const cats = activeVehiculeCats();
+  const groups = cats.map(c => {
+    const items = actifs.filter(v => v.categorie === c.nom);
+    if (!items.length) return '';
+    const label = (c.icon ? c.icon + ' ' : '') + c.nom;
+    return `<optgroup label="${escapeHtml(label)}">` +
+      items.map(v => `<option value="${escapeHtml(v.nom)}">${escapeHtml(v.nom)}</option>`).join('') +
+      `</optgroup>`;
+  }).join('');
+  const orphelins = actifs.filter(v => !cats.some(c => c.nom === v.categorie));
+  const orphHtml = orphelins.length
+    ? `<optgroup label="Autres">` +
+      orphelins.map(v => `<option value="${escapeHtml(v.nom)}">${escapeHtml(v.nom)}</option>`).join('') +
+      `</optgroup>`
+    : '';
+  const htmlActifs = groups + orphHtml;
   ['e-vehicule', 'ed-vehicule', 'r-vehicule-type'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
