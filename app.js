@@ -1839,7 +1839,7 @@ formLogin.addEventListener('submit', async (ev) => {
     const msg = (error.message || '').toLowerCase();
     const code = (error.code || '').toLowerCase();
     if (code.includes('banned') || code.includes('disabled') || msg.includes('banned') || msg.includes('disabled')) {
-      loginError.textContent = 'Ce compte est désactivé. Contacte le super administrateur.';
+      loginError.textContent = 'Compte désactivé. Contacte le super admin.';
     } else {
       loginError.textContent = 'Téléphone ou mot de passe incorrect.';
     }
