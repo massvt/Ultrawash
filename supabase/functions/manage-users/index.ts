@@ -55,7 +55,6 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
   const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
   // Client service-role pour les opérations admin
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
@@ -67,15 +66,12 @@ Deno.serve(async (req) => {
   const jwt = authHeader.replace(/^Bearer\s+/i, '')
   if (!jwt) return jsonResponse({ error: 'Missing Authorization' }, 401)
 
-  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-    auth: { persistSession: false },
-  })
-
-  const { data: { user }, error: userErr } = await userClient.auth.getUser()
-  if (userErr || !user) {
-    return jsonResponse({ error: 'Invalid token' }, 401)
+  // Valide le JWT directement via le client admin (plus fiable en Deno)
+  const { data: userData, error: userErr } = await admin.auth.getUser(jwt)
+  if (userErr || !userData?.user) {
+    return jsonResponse({ error: 'Invalid token: ' + (userErr?.message || 'no user') }, 401)
   }
+  const user = userData.user
 
   const { data: caller, error: profErr } = await admin
     .from('profiles')
