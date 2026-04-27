@@ -140,8 +140,9 @@ const DB = {
   async setVehiculeTypeCategorie(nom, categorie) {
     const { data, error } = await sb.from('vehicule_types')
       .update({ categorie, updated_at: new Date().toISOString() })
-      .eq('nom', nom).select().single();
+      .eq('nom', nom).select().maybeSingle();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (!data) return null;
     const i = cache.vehiculeTypes.findIndex(v => v.nom === nom);
     if (i !== -1) cache.vehiculeTypes[i] = data;
     return data;
@@ -161,8 +162,9 @@ const DB = {
   async toggleVehiculeType(nom, actif) {
     const { data, error } = await sb.from('vehicule_types')
       .update({ actif, updated_at: new Date().toISOString() })
-      .eq('nom', nom).select().single();
+      .eq('nom', nom).select().maybeSingle();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (!data) return null;
     const i = cache.vehiculeTypes.findIndex(v => v.nom === nom);
     if (i !== -1) cache.vehiculeTypes[i] = data;
     return data;
@@ -240,8 +242,9 @@ const DB = {
   async updateService(nom, prix) {
     const { data, error } = await sb.from('services')
       .update({ prix, updated_at: new Date().toISOString() })
-      .eq('nom', nom).select().single();
+      .eq('nom', nom).select().maybeSingle();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (!data) return null;
     const i = cache.services.findIndex(s => s.nom === nom);
     if (i !== -1) cache.services[i] = data;
     if (data.actif) PRIX[nom] = data.prix; else delete PRIX[nom];
@@ -262,8 +265,9 @@ const DB = {
   async toggleService(nom, actif) {
     const { data, error } = await sb.from('services')
       .update({ actif, updated_at: new Date().toISOString() })
-      .eq('nom', nom).select().single();
+      .eq('nom', nom).select().maybeSingle();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (!data) return null;
     const i = cache.services.findIndex(s => s.nom === nom);
     if (i !== -1) cache.services[i] = data;
     if (actif) PRIX[nom] = data.prix; else delete PRIX[nom];
@@ -313,8 +317,9 @@ const DB = {
   async setServiceCategorie(nom, categorie) {
     const { data, error } = await sb.from('services')
       .update({ categorie, updated_at: new Date().toISOString() })
-      .eq('nom', nom).select().single();
+      .eq('nom', nom).select().maybeSingle();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (!data) return null;
     const i = cache.services.findIndex(s => s.nom === nom);
     if (i !== -1) cache.services[i] = data;
     return data;
