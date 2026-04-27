@@ -1816,10 +1816,25 @@ formLogin.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   loginError.textContent = '';
   loginBtn.disabled = true;
-  const telephone = document.getElementById('login-telephone').value.trim();
+  const raw = document.getElementById('login-telephone').value.trim();
   const password = document.getElementById('login-password').value;
-  const email = phoneToEmail(telephone);
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  // Accepte téléphone OU email (si on tape un @, on prend tel quel)
+  const email = raw.includes('@') ? raw : phoneToEmail(raw);
+  let { data, error } = await sb.auth.signInWithPassword({ email, password });
+  // Fallback : si l'email synthétique échoue, essayer les anciens emails connus
+  if (error && !raw.includes('@')) {
+    const tel = raw.replace(/\D/g, '');
+    const legacyMap = {
+      '781436380': 'admin@ultrawash.sn',
+      '774780264': 'agent1@ultrawash.sn',
+      '776791841': 'agent2@ultrawash.sn',
+    };
+    const legacy = legacyMap[tel];
+    if (legacy) {
+      const r = await sb.auth.signInWithPassword({ email: legacy, password });
+      if (!r.error) { data = r.data; error = null; }
+    }
+  }
   if (error) {
     loginError.textContent = 'Téléphone ou mot de passe incorrect.';
     loginBtn.disabled = false;
