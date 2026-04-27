@@ -396,12 +396,121 @@ nav {
 .btn-danger:hover { background: #c62828; }
 .btn-danger-sm {
   background: transparent; color: var(--red); border: 1px solid var(--red);
-  padding: 5px 9px; border-radius: 6px; cursor: pointer; font-size: .9rem;
+  padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: .85rem;
 }
 .btn-danger-sm:hover { background: var(--red); color: #fff; }
 .btn-danger-sm:disabled { opacity: .4; cursor: not-allowed; }
-#usersTable .row-actions { display: flex; gap: 6px; }
-#usersTable .u-role-sel { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--gray-200); }
+
+/* ===== PAGE UTILISATEURS — cartes fun ===== */
+.users-stats {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 0 0 24px;
+}
+.stat-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+  border: 1px solid var(--gray-200);
+  padding: 10px 16px; border-radius: 999px;
+  font-size: .85rem; color: var(--gray-700);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+  transition: transform .15s, box-shadow .15s;
+}
+.stat-pill:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(15, 23, 42, .08); }
+.stat-pill .stat-icon { font-size: 1.1rem; }
+.stat-pill .stat-num { font-weight: 700; color: var(--text); font-size: 1rem; }
+.stat-pill .stat-label { color: #64748b; }
+.stat-pill-warn { background: linear-gradient(135deg, #fef3c7, #fde68a); border-color: #fcd34d; color: #92400e; }
+.stat-pill-warn .stat-num { color: #92400e; }
+
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+.users-empty {
+  grid-column: 1 / -1;
+  text-align: center; color: #94a3b8;
+  padding: 48px 16px; font-style: italic;
+  background: #f8fafc; border-radius: 12px;
+}
+.users-empty.error { color: #b91c1c; background: #fef2f2; }
+
+.user-card {
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: 14px; padding: 18px;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+  position: relative; overflow: hidden;
+}
+.user-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, #2563eb, #7c3aed, #db2777);
+  opacity: 0; transition: opacity .2s;
+}
+.user-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, .08);
+  border-color: #cbd5e1;
+}
+.user-card:hover::before { opacity: 1; }
+.user-card.is-inactive { opacity: .65; background: #f8fafc; }
+.user-card.is-inactive::after {
+  content: 'DÉSACTIVÉ'; position: absolute; top: 14px; right: -34px;
+  background: #94a3b8; color: #fff; font-size: .65rem; font-weight: 700;
+  padding: 3px 40px; transform: rotate(35deg); letter-spacing: 1px;
+}
+
+.user-card-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.user-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 1.05rem;
+  flex-shrink: 0;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, .15);
+}
+.user-card-info { flex: 1; min-width: 0; }
+.user-name {
+  font-weight: 600; color: var(--text); font-size: 1rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.self-tag {
+  display: inline-block; background: #dbeafe; color: #1e40af;
+  font-size: .65rem; font-weight: 700; padding: 2px 7px;
+  border-radius: 999px; margin-left: 4px; vertical-align: middle;
+}
+.user-tel { color: #64748b; font-size: .82rem; margin-top: 2px; }
+
+.role-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: .72rem; font-weight: 600; white-space: nowrap;
+}
+.role-badge-super { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; }
+.role-badge-admin { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #1e40af; }
+.role-badge-agent { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #065f46; }
+
+.user-card-controls {
+  display: flex; flex-direction: column; gap: 8px;
+  border-top: 1px dashed var(--gray-200); padding-top: 12px;
+}
+.user-control-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: .85rem; color: #475569;
+}
+.user-control-row .ctrl-label { font-weight: 500; }
+.user-control-row select {
+  padding: 5px 8px; border-radius: 6px; border: 1px solid var(--gray-200);
+  font-size: .85rem; background: #fff; cursor: pointer;
+}
+.actif-wrap { display: flex; align-items: center; gap: 10px; }
+.actif-text { font-size: .8rem; color: #64748b; min-width: 30px; text-align: right; }
+
+.user-card-actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  border-top: 1px dashed var(--gray-200); padding-top: 12px;
+}
+.user-card-actions button { flex: 1; min-width: 120px; }
 
 .btn-outline {
   background: #fff;

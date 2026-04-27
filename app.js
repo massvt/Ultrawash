@@ -1836,7 +1836,13 @@ formLogin.addEventListener('submit', async (ev) => {
     }
   }
   if (error) {
-    loginError.textContent = 'Téléphone ou mot de passe incorrect.';
+    const msg = (error.message || '').toLowerCase();
+    const code = (error.code || '').toLowerCase();
+    if (code.includes('banned') || code.includes('disabled') || msg.includes('banned') || msg.includes('disabled')) {
+      loginError.textContent = 'Ce compte est désactivé. Contacte le super administrateur.';
+    } else {
+      loginError.textContent = 'Téléphone ou mot de passe incorrect.';
+    }
     loginBtn.disabled = false;
     return;
   }
@@ -1887,74 +1893,132 @@ async function callManageUsers(action, body = {}) {
   return data;
 }
 
+const ROLE_BADGE = {
+  super_admin: { label: 'Super admin', icon: '👑', cls: 'role-badge-super' },
+  admin:       { label: 'Admin',       icon: '🛠️', cls: 'role-badge-admin' },
+  agent:       { label: 'Agent',       icon: '🧤', cls: 'role-badge-agent' },
+};
+
+const AVATAR_PALETTE = [
+  '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a',
+  '#0891b2', '#9333ea', '#e11d48', '#ca8a04', '#0d9488'
+];
+
+function userInitials(u) {
+  const p = (u.prenom || '').trim();
+  const n = (u.nom || '').trim();
+  const ini = ((p[0] || '') + (n[0] || '')).toUpperCase();
+  return ini || (u.telephone || '?').slice(-2);
+}
+
+function userColor(u) {
+  const seed = (u.telephone || u.id || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0);
+  return AVATAR_PALETTE[seed % AVATAR_PALETTE.length];
+}
+
 async function renderUsersPage() {
   if (!isSuperAdmin()) return;
-  const tbody = document.getElementById('usersTbody');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:24px">Chargement…</td></tr>';
+  const grid = document.getElementById('usersGrid');
+  const stats = document.getElementById('usersStats');
+  grid.innerHTML = '<div class="users-empty">Chargement…</div>';
+  stats.innerHTML = '';
   const res = await callManageUsers('list');
-  if (!res) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#e53935;padding:24px">Impossible de charger.</td></tr>'; return; }
+  if (!res) { grid.innerHTML = '<div class="users-empty error">Impossible de charger.</div>'; return; }
   const users = res.users || [];
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:24px">Aucun utilisateur.</td></tr>';
+    grid.innerHTML = '<div class="users-empty">Aucun utilisateur.</div>';
     return;
   }
-  tbody.innerHTML = users.map(u => `
-    <tr data-id="${u.id}">
-      <td>${escapeHtml(u.telephone || '—')}</td>
-      <td>${escapeHtml([u.prenom, u.nom].filter(Boolean).join(' ') || '—')}</td>
-      <td>
-        <select class="u-role-sel" ${u.id === session.user.id ? 'disabled' : ''}>
-          <option value="agent" ${u.role === 'agent' ? 'selected' : ''}>Agent</option>
-          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
-          <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>Super admin</option>
-        </select>
-      </td>
-      <td>
-        <label class="switch">
-          <input type="checkbox" class="u-actif-chk" ${u.actif ? 'checked' : ''} ${u.id === session.user.id ? 'disabled' : ''} />
-          <span class="slider"></span>
-        </label>
-      </td>
-      <td class="row-actions">
-        <button class="btn-outline u-pwd" title="Réinitialiser mot de passe">🔑</button>
-        <button class="btn-danger-sm u-del" title="Supprimer" ${u.id === session.user.id ? 'disabled' : ''}>🗑️</button>
-      </td>
-    </tr>
-  `).join('');
 
-  tbody.querySelectorAll('.u-role-sel').forEach(sel => {
+  const count = users.length;
+  const supers = users.filter(u => u.role === 'super_admin').length;
+  const admins = users.filter(u => u.role === 'admin').length;
+  const agents = users.filter(u => u.role === 'agent').length;
+  const inactifs = users.filter(u => !u.actif).length;
+  stats.innerHTML = `
+    <div class="stat-pill"><span class="stat-num">${count}</span><span class="stat-label">utilisateur${count > 1 ? 's' : ''}</span></div>
+    <div class="stat-pill"><span class="stat-icon">👑</span><span class="stat-num">${supers}</span><span class="stat-label">super admin${supers > 1 ? 's' : ''}</span></div>
+    <div class="stat-pill"><span class="stat-icon">🛠️</span><span class="stat-num">${admins}</span><span class="stat-label">admin${admins > 1 ? 's' : ''}</span></div>
+    <div class="stat-pill"><span class="stat-icon">🧤</span><span class="stat-num">${agents}</span><span class="stat-label">agent${agents > 1 ? 's' : ''}</span></div>
+    ${inactifs ? `<div class="stat-pill stat-pill-warn"><span class="stat-icon">💤</span><span class="stat-num">${inactifs}</span><span class="stat-label">désactivé${inactifs > 1 ? 's' : ''}</span></div>` : ''}
+  `;
+
+  grid.innerHTML = users.map(u => {
+    const isSelf = u.id === session.user.id;
+    const badge = ROLE_BADGE[u.role] || ROLE_BADGE.agent;
+    const fullName = [u.prenom, u.nom].filter(Boolean).join(' ') || '—';
+    return `
+      <div class="user-card ${u.actif ? '' : 'is-inactive'}" data-id="${u.id}">
+        <div class="user-card-top">
+          <div class="user-avatar" style="background:${userColor(u)}">${escapeHtml(userInitials(u))}</div>
+          <div class="user-card-info">
+            <div class="user-name">${escapeHtml(fullName)} ${isSelf ? '<span class="self-tag">moi</span>' : ''}</div>
+            <div class="user-tel">📞 ${escapeHtml(u.telephone || '—')}</div>
+          </div>
+          <span class="role-badge ${badge.cls}">${badge.icon} ${badge.label}</span>
+        </div>
+        <div class="user-card-controls">
+          <label class="user-control-row">
+            <span class="ctrl-label">Rôle</span>
+            <select class="u-role-sel" ${isSelf ? 'disabled' : ''}>
+              <option value="agent" ${u.role === 'agent' ? 'selected' : ''}>🧤 Agent</option>
+              <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>🛠️ Admin</option>
+              <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>👑 Super admin</option>
+            </select>
+          </label>
+          <label class="user-control-row">
+            <span class="ctrl-label">Actif</span>
+            <span class="actif-wrap">
+              <span class="actif-text">${u.actif ? 'Oui' : 'Non'}</span>
+              <label class="switch">
+                <input type="checkbox" class="u-actif-chk" ${u.actif ? 'checked' : ''} ${isSelf ? 'disabled' : ''} />
+                <span class="slider"></span>
+              </label>
+            </span>
+          </label>
+        </div>
+        <div class="user-card-actions">
+          <button class="btn-outline u-pwd" title="Réinitialiser mot de passe">🔑 Mot de passe</button>
+          <button class="btn-danger-sm u-del" title="Supprimer" ${isSelf ? 'disabled' : ''}>🗑️ Supprimer</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  grid.querySelectorAll('.u-role-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
-      const id = sel.closest('tr').dataset.id;
+      const id = sel.closest('.user-card').dataset.id;
       const r = await callManageUsers('update', { id, role: sel.value });
-      if (r) { toast('Rôle mis à jour'); renderUsersPage(); }
-      else renderUsersPage();
+      if (r) toast('Rôle mis à jour');
+      renderUsersPage();
     });
   });
 
-  tbody.querySelectorAll('.u-actif-chk').forEach(chk => {
+  grid.querySelectorAll('.u-actif-chk').forEach(chk => {
     chk.addEventListener('change', async () => {
-      const id = chk.closest('tr').dataset.id;
+      const id = chk.closest('.user-card').dataset.id;
       const r = await callManageUsers('update', { id, actif: chk.checked });
-      if (r) { toast(chk.checked ? 'Compte activé' : 'Compte désactivé'); renderUsersPage(); }
-      else renderUsersPage();
+      if (r) toast(chk.checked ? 'Compte activé' : 'Compte désactivé');
+      renderUsersPage();
     });
   });
 
-  tbody.querySelectorAll('.u-pwd').forEach(btn => {
+  grid.querySelectorAll('.u-pwd').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const id = btn.closest('tr').dataset.id;
+      const id = btn.closest('.user-card').dataset.id;
       const pwd = prompt('Nouveau mot de passe (6+ caractères) :');
-      if (!pwd || pwd.length < 6) { if (pwd !== null) toast('Mot de passe trop court', '#e53935'); return; }
+      if (pwd === null) return;
+      if (pwd.length < 6) { toast('Mot de passe trop court', '#e53935'); return; }
       const r = await callManageUsers('reset-password', { id, password: pwd });
       if (r) toast('Mot de passe réinitialisé');
     });
   });
 
-  tbody.querySelectorAll('.u-del').forEach(btn => {
+  grid.querySelectorAll('.u-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const tr = btn.closest('tr');
-      const id = tr.dataset.id;
-      const nom = tr.children[1].textContent;
+      const card = btn.closest('.user-card');
+      const id = card.dataset.id;
+      const nom = card.querySelector('.user-name').textContent.trim();
       if (!confirm(`Supprimer définitivement "${nom}" ? Cette action est irréversible.`)) return;
       const r = await callManageUsers('delete', { id });
       if (r) { toast('Utilisateur supprimé'); renderUsersPage(); }
