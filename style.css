@@ -39,6 +39,7 @@ body {
   position: fixed;
   top: 0; left: 0; bottom: 0;
   z-index: 100;
+  overflow: hidden;
 }
 
 .logo {
@@ -53,7 +54,17 @@ body {
 .logo-icon { font-size: 1.6rem; }
 .logo-img { width: 100%; max-width: 180px; height: auto; display: block; margin: 0 auto; }
 
-nav { display: flex; flex-direction: column; gap: 4px; }
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+nav::-webkit-scrollbar { width: 6px; }
+nav::-webkit-scrollbar-thumb { background: var(--sidebar-hover); border-radius: 3px; }
 
 .nav-btn {
   display: flex;
@@ -679,9 +690,10 @@ body.role-employe .patron-only { display: none !important; }
 
 /* ===== SIDEBAR FOOTER (user info + logout) ===== */
 .sidebar-footer {
-  margin-top: auto;
+  flex-shrink: 0;
   padding: 14px 8px 4px;
   border-top: 1px solid var(--sidebar-hover);
+  background: var(--sidebar);
 }
 .user-info {
   padding: 4px 4px 10px;
