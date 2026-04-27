@@ -35,7 +35,7 @@ body {
   color: #e2e8f0;
   display: flex;
   flex-direction: column;
-  padding: 24px 12px;
+  padding: 16px 10px;
   position: fixed;
   top: 0; left: 0; bottom: 0;
   z-index: 100;
@@ -46,44 +46,42 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 8px 28px;
+  padding: 0 8px 14px;
   font-size: 1.3rem;
   color: #fff;
+  flex-shrink: 0;
 }
 
 .logo-icon { font-size: 1.6rem; }
-.logo-img { width: 100%; max-width: 180px; height: auto; display: block; margin: 0 auto; }
+.logo-img { width: 100%; max-width: 140px; height: auto; display: block; margin: 0 auto; }
 
 nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
 }
-nav::-webkit-scrollbar { width: 6px; }
-nav::-webkit-scrollbar-thumb { background: var(--sidebar-hover); border-radius: 3px; }
 
 .nav-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: none;
   border: none;
   color: #94a3b8;
-  padding: 11px 14px;
-  border-radius: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   text-align: left;
   transition: all .15s;
+  white-space: nowrap;
 }
 
 .nav-btn:hover { background: var(--sidebar-hover); color: #e2e8f0; }
 .nav-btn.active { background: var(--blue); color: #fff; }
-.nav-btn .icon { font-size: 1.1rem; }
+.nav-btn .icon { font-size: 1rem; }
 
 /* ===== CONTENT ===== */
 .content {
@@ -691,13 +689,13 @@ body.role-employe .patron-only { display: none !important; }
 /* ===== SIDEBAR FOOTER (user info + logout) ===== */
 .sidebar-footer {
   flex-shrink: 0;
-  padding: 14px 8px 4px;
+  padding: 10px 6px 4px;
   border-top: 1px solid var(--sidebar-hover);
   background: var(--sidebar);
 }
 .user-info {
-  padding: 4px 4px 10px;
-  font-size: .82rem;
+  padding: 4px 4px 8px;
+  font-size: .75rem;
 }
 .user-email {
   color: #fff;
@@ -713,13 +711,13 @@ body.role-employe .patron-only { display: none !important; }
 }
 .btn-logout {
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: transparent;
   color: #e2e8f0;
   border: 1px solid var(--sidebar-hover);
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
-  font-size: .85rem;
+  font-size: .78rem;
   transition: background .15s;
 }
 .btn-logout:hover { background: var(--sidebar-hover); }
