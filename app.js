@@ -5,7 +5,8 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // État session + rôle courant
 const session = { user: null, role: null };
-const isPatron = () => session.role === 'patron';
+const isAdmin = () => session.role === 'admin' || session.role === 'super_admin';
+const isSuperAdmin = () => session.role === 'super_admin';
 
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
 const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], vehiculeTypes: [], serviceCategories: [], vehiculeCategories: [], clientsLoaded: false };
@@ -436,6 +437,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.page === 'historique') renderHistorique();
     if (btn.dataset.page === 'tarifs') renderTarifsPage();
     if (btn.dataset.page === 'vehicules') renderVehiculesPage();
+    if (btn.dataset.page === 'utilisateurs') renderUsersPage();
     closeSidebar();
   });
 });
@@ -928,7 +930,7 @@ document.getElementById('e-plaque').addEventListener('input', (ev) => {
 function renderEntreesList() {
   const list = DB.getEntrees().slice(0, 20);
   const tbody = document.getElementById('entreesList');
-  const canDelete = isPatron();
+  const canDelete = isAdmin();
   tbody.innerHTML = list.map(e => `
     <tr>
       <td>${fmtDate(e.date)} ${e.heure || ''}</td>
@@ -1727,15 +1729,21 @@ const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 
 function showLogin() {
-  document.body.classList.remove('auth-loading', 'authed', 'role-patron', 'role-employe');
-  setTimeout(() => document.getElementById('login-email')?.focus(), 50);
+  document.body.classList.remove('auth-loading', 'authed', 'role-super-admin', 'role-admin', 'role-agent');
+  setTimeout(() => document.getElementById('login-telephone')?.focus(), 50);
 }
 
+const ROLE_LABEL = { super_admin: 'Super admin', admin: 'Admin', agent: 'Agent' };
+
 function applyRoleUI() {
-  document.body.classList.remove('role-patron', 'role-employe');
-  document.body.classList.add('role-' + (session.role === 'patron' ? 'patron' : 'employe'));
-  document.getElementById('userEmail').textContent = session.user?.email || '';
-  document.getElementById('userRole').textContent = session.role || '';
+  document.body.classList.remove('role-super-admin', 'role-admin', 'role-agent');
+  if (session.role === 'super_admin') document.body.classList.add('role-super-admin');
+  else if (session.role === 'admin')  document.body.classList.add('role-admin');
+  else                                document.body.classList.add('role-agent');
+  const profile = session.profile || {};
+  const fullName = [profile.prenom, profile.nom].filter(Boolean).join(' ');
+  document.getElementById('userEmail').textContent = fullName || profile.telephone || session.user?.email || '';
+  document.getElementById('userRole').textContent = ROLE_LABEL[session.role] || session.role || '';
 }
 
 function goToPage(page) {
@@ -1749,18 +1757,26 @@ function goToPage(page) {
 async function loadProfile() {
   const { data, error } = await sb
     .from('profiles')
-    .select('role')
+    .select('role, telephone, prenom, nom, actif')
     .eq('id', session.user.id)
-    .single();
+    .maybeSingle();
   if (error || !data) {
     console.error('Profil introuvable', error);
     await sb.auth.signOut();
-    session.user = null; session.role = null;
+    session.user = null; session.role = null; session.profile = null;
     showLogin();
     loginError.textContent = "Aucun profil associé. Contacte l'administrateur.";
     return false;
   }
+  if (data.actif === false) {
+    await sb.auth.signOut();
+    session.user = null; session.role = null; session.profile = null;
+    showLogin();
+    loginError.textContent = "Ce compte est désactivé.";
+    return false;
+  }
   session.role = data.role;
+  session.profile = data;
   return true;
 }
 
@@ -1780,7 +1796,7 @@ async function startApp() {
     if (p != null && p > 0) eMontant.value = p;
   }
   // Page de démarrage selon le rôle
-  if (isPatron()) {
+  if (isAdmin()) {
     goToPage('dashboard');
     renderDashboard();
   } else {
@@ -1791,15 +1807,21 @@ async function startApp() {
   refreshDashResaToday();
 }
 
+const PHONE_EMAIL_DOMAIN = 'ultrawash.local';
+function phoneToEmail(tel) {
+  return String(tel || '').replace(/\D/g, '') + '@' + PHONE_EMAIL_DOMAIN;
+}
+
 formLogin.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   loginError.textContent = '';
   loginBtn.disabled = true;
-  const email = document.getElementById('login-email').value.trim();
+  const telephone = document.getElementById('login-telephone').value.trim();
   const password = document.getElementById('login-password').value;
+  const email = phoneToEmail(telephone);
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {
-    loginError.textContent = 'Email ou mot de passe incorrect.';
+    loginError.textContent = 'Téléphone ou mot de passe incorrect.';
     loginBtn.disabled = false;
     return;
   }
@@ -1816,6 +1838,136 @@ logoutBtn.addEventListener('click', async () => {
   session.user = null; session.role = null;
   cache.entrees = []; cache.sorties = [];
   showLogin();
+});
+
+// ===== UTILISATEURS (super_admin only) =====
+async function callManageUsers(action, body = {}) {
+  const { data, error } = await sb.functions.invoke('manage-users', {
+    body: { action, ...body }
+  });
+  if (error) {
+    const msg = data?.error || error.message || 'Erreur réseau';
+    toast('Erreur : ' + msg, '#e53935');
+    return null;
+  }
+  if (data?.error) {
+    toast('Erreur : ' + data.error, '#e53935');
+    return null;
+  }
+  return data;
+}
+
+async function renderUsersPage() {
+  if (!isSuperAdmin()) return;
+  const tbody = document.getElementById('usersTbody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:24px">Chargement…</td></tr>';
+  const res = await callManageUsers('list');
+  if (!res) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#e53935;padding:24px">Impossible de charger.</td></tr>'; return; }
+  const users = res.users || [];
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:24px">Aucun utilisateur.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(u => `
+    <tr data-id="${u.id}">
+      <td>${escapeHtml(u.telephone || '—')}</td>
+      <td>${escapeHtml([u.prenom, u.nom].filter(Boolean).join(' ') || '—')}</td>
+      <td>
+        <select class="u-role-sel" ${u.id === session.user.id ? 'disabled' : ''}>
+          <option value="agent" ${u.role === 'agent' ? 'selected' : ''}>Agent</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+          <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>Super admin</option>
+        </select>
+      </td>
+      <td>
+        <label class="switch">
+          <input type="checkbox" class="u-actif-chk" ${u.actif ? 'checked' : ''} ${u.id === session.user.id ? 'disabled' : ''} />
+          <span class="slider"></span>
+        </label>
+      </td>
+      <td class="row-actions">
+        <button class="btn-outline u-pwd" title="Réinitialiser mot de passe">🔑</button>
+        <button class="btn-danger-sm u-del" title="Supprimer" ${u.id === session.user.id ? 'disabled' : ''}>🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('.u-role-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const id = sel.closest('tr').dataset.id;
+      const r = await callManageUsers('update', { id, role: sel.value });
+      if (r) { toast('Rôle mis à jour'); renderUsersPage(); }
+      else renderUsersPage();
+    });
+  });
+
+  tbody.querySelectorAll('.u-actif-chk').forEach(chk => {
+    chk.addEventListener('change', async () => {
+      const id = chk.closest('tr').dataset.id;
+      const r = await callManageUsers('update', { id, actif: chk.checked });
+      if (r) { toast(chk.checked ? 'Compte activé' : 'Compte désactivé'); renderUsersPage(); }
+      else renderUsersPage();
+    });
+  });
+
+  tbody.querySelectorAll('.u-pwd').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('tr').dataset.id;
+      const pwd = prompt('Nouveau mot de passe (6+ caractères) :');
+      if (!pwd || pwd.length < 6) { if (pwd !== null) toast('Mot de passe trop court', '#e53935'); return; }
+      const r = await callManageUsers('reset-password', { id, password: pwd });
+      if (r) toast('Mot de passe réinitialisé');
+    });
+  });
+
+  tbody.querySelectorAll('.u-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tr = btn.closest('tr');
+      const id = tr.dataset.id;
+      const nom = tr.children[1].textContent;
+      if (!confirm(`Supprimer définitivement "${nom}" ? Cette action est irréversible.`)) return;
+      const r = await callManageUsers('delete', { id });
+      if (r) { toast('Utilisateur supprimé'); renderUsersPage(); }
+    });
+  });
+}
+
+// Modale de création
+const userModal = document.getElementById('userModal');
+const userError = document.getElementById('userError');
+
+function openUserModal() {
+  document.getElementById('formUser').reset();
+  document.getElementById('u-role').value = 'agent';
+  userError.textContent = '';
+  userModal.style.display = 'flex';
+  setTimeout(() => document.getElementById('u-prenom').focus(), 50);
+}
+function closeUserModal() { userModal.style.display = 'none'; }
+
+document.getElementById('btnAddUser')?.addEventListener('click', openUserModal);
+document.getElementById('userModalClose')?.addEventListener('click', closeUserModal);
+document.getElementById('userCancel')?.addEventListener('click', closeUserModal);
+
+document.getElementById('formUser')?.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  userError.textContent = '';
+  const submitBtn = document.getElementById('userSubmit');
+  submitBtn.disabled = true;
+  const body = {
+    prenom: document.getElementById('u-prenom').value.trim(),
+    nom: document.getElementById('u-nom').value.trim(),
+    telephone: document.getElementById('u-telephone').value.trim(),
+    role: document.getElementById('u-role').value,
+    password: document.getElementById('u-password').value,
+  };
+  const r = await callManageUsers('create', body);
+  submitBtn.disabled = false;
+  if (r) {
+    toast('Compte créé');
+    closeUserModal();
+    renderUsersPage();
+  }
 });
 
 // ===== INIT =====
@@ -2254,7 +2406,7 @@ function renderReservationsList() {
   empty.style.display = 'none';
 
   tbody.innerHTML = list.map(r => {
-    const canDelete = isPatron();
+    const canDelete = isAdmin();
     const heure = (r.heure_prevue || '').slice(0,5);
     return `
       <tr>

@@ -46,8 +46,8 @@ alter table public.profiles
 update public.profiles p
    set role       = 'super_admin',
        telephone  = '781436380',
-       prenom     = coalesce(nullif(p.prenom, ''), 'Assane'),
-       nom        = coalesce(nullif(p.nom, ''), 'Sarr'),
+       prenom     = coalesce(nullif(p.prenom, ''), 'Samba'),
+       nom        = coalesce(nullif(p.nom, ''), 'SAMB'),
        actif      = true,
        updated_at = now()
   from auth.users u
@@ -58,8 +58,8 @@ update public.profiles p
 update public.profiles p
    set role       = 'agent',
        telephone  = '774780264',
-       prenom     = coalesce(nullif(p.prenom, ''), 'Agent'),
-       nom        = coalesce(nullif(p.nom, ''), 'Un'),
+       prenom     = coalesce(nullif(p.prenom, ''), 'Ndeye Codou'),
+       nom        = coalesce(nullif(p.nom, ''), 'NIANG'),
        actif      = true,
        updated_at = now()
   from auth.users u
@@ -70,8 +70,8 @@ update public.profiles p
 update public.profiles p
    set role       = 'agent',
        telephone  = '776791841',
-       prenom     = coalesce(nullif(p.prenom, ''), 'Agent'),
-       nom        = coalesce(nullif(p.nom, ''), 'Deux'),
+       prenom     = coalesce(nullif(p.prenom, ''), 'Berry'),
+       nom        = coalesce(nullif(p.nom, ''), 'DIOP'),
        actif      = true,
        updated_at = now()
   from auth.users u

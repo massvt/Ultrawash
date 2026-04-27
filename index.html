@@ -17,8 +17,8 @@
       <h1>Connexion</h1>
       <form id="formLogin">
         <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="login-email" autocomplete="username" required />
+          <label>Téléphone</label>
+          <input type="tel" id="login-telephone" autocomplete="username" inputmode="numeric" placeholder="ex : 781234567" required />
         </div>
         <div class="form-group">
           <label>Mot de passe</label>
@@ -38,13 +38,13 @@
       <img src="logo_ultrawash.webp" alt="UltraWash" class="logo-img" />
     </div>
     <nav>
-      <button class="nav-btn active patron-only" data-page="dashboard">
+      <button class="nav-btn active admin-only" data-page="dashboard">
         <span class="icon">📊</span> Dashboard
       </button>
       <button class="nav-btn" data-page="entrees">
         <span class="icon">➕</span> Entrées
       </button>
-      <button class="nav-btn patron-only" data-page="sorties">
+      <button class="nav-btn admin-only" data-page="sorties">
         <span class="icon">➖</span> Sorties
       </button>
       <button class="nav-btn" data-page="clients">
@@ -57,11 +57,14 @@
       <button class="nav-btn" data-page="historique">
         <span class="icon">📋</span> Historique
       </button>
-      <button class="nav-btn patron-only" data-page="tarifs">
+      <button class="nav-btn admin-only" data-page="tarifs">
         <span class="icon">💰</span> Prestations & Tarifs
       </button>
-      <button class="nav-btn patron-only" data-page="vehicules">
+      <button class="nav-btn admin-only" data-page="vehicules">
         <span class="icon">🧽</span> Types de service
+      </button>
+      <button class="nav-btn super-admin-only" data-page="utilisateurs">
+        <span class="icon">👥</span> Utilisateurs
       </button>
     </nav>
     <div class="sidebar-footer">
@@ -532,7 +535,81 @@
       <div id="vehiculesList" class="tarifs-accordion"></div>
     </section>
 
+    <!-- UTILISATEURS (super_admin only) -->
+    <section id="page-utilisateurs" class="page">
+      <header class="page-header">
+        <h1>Utilisateurs</h1>
+        <div class="header-actions">
+          <button class="btn-primary" id="btnAddUser">+ Nouvel utilisateur</button>
+        </div>
+      </header>
+      <p class="tarifs-hint">Gère les comptes (super_admin, admin, agent). La connexion se fait par téléphone + mot de passe.</p>
+      <div class="table-wrap">
+        <table class="data-table" id="usersTable">
+          <thead>
+            <tr>
+              <th>Téléphone</th>
+              <th>Nom complet</th>
+              <th>Rôle</th>
+              <th>Actif</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
   </main>
+
+  <!-- MODALE : nouvel utilisateur -->
+  <div id="userModal" class="modal" style="display:none">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h3 id="userModalTitle">Nouvel utilisateur</h3>
+        <button class="btn-close" id="userModalClose">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="formUser">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prénom</label>
+              <input type="text" id="u-prenom" required maxlength="60" />
+            </div>
+            <div class="form-group">
+              <label>Nom</label>
+              <input type="text" id="u-nom" required maxlength="60" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Téléphone</label>
+              <input type="tel" id="u-telephone" inputmode="numeric" placeholder="781234567" required />
+            </div>
+            <div class="form-group">
+              <label>Rôle</label>
+              <select id="u-role" required>
+                <option value="agent">Agent</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super admin</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Mot de passe initial</label>
+              <input type="text" id="u-password" minlength="6" required placeholder="6 caractères minimum" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-outline" id="userCancel">Annuler</button>
+            <button type="submit" class="btn-primary" id="userSubmit">Créer le compte</button>
+          </div>
+          <div id="userError" class="login-error"></div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast"></div>
 
@@ -705,7 +782,7 @@
         <div id="ficheEmpty" class="empty-state">Aucun lavage enregistré pour ce client.</div>
         <div class="modal-actions">
           <button type="button" class="btn-outline" id="ficheEdit">Modifier</button>
-          <button type="button" class="btn-danger patron-only" id="ficheDelete">Supprimer le client</button>
+          <button type="button" class="btn-danger admin-only" id="ficheDelete">Supprimer le client</button>
         </div>
       </div>
     </div>
