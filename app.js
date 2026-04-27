@@ -1846,7 +1846,15 @@ async function callManageUsers(action, body = {}) {
     body: { action, ...body }
   });
   if (error) {
-    const msg = data?.error || error.message || 'Erreur réseau';
+    let msg = error.message || 'Erreur réseau';
+    // Quand status != 2xx, supabase-js met la Response dans error.context
+    try {
+      if (error.context && typeof error.context.json === 'function') {
+        const body = await error.context.clone().json();
+        if (body?.error) msg = body.error;
+      }
+    } catch (_) { /* ignore parse errors */ }
+    console.error('manage-users error:', error, 'data:', data);
     toast('Erreur : ' + msg, '#e53935');
     return null;
   }
