@@ -2040,6 +2040,24 @@ const userModal = document.getElementById('userModal');
 const userError = document.getElementById('userError');
 let editingUserId = null;
 
+function setUserModalRole(role) {
+  document.getElementById('u-role').value = role;
+  document.querySelectorAll('input[name="u-role-radio"]').forEach(r => {
+    r.checked = (r.value === role);
+  });
+}
+
+function updateUserModalAvatar() {
+  const av = document.getElementById('userModalAvatar');
+  if (!av) return;
+  const p = document.getElementById('u-prenom').value.trim();
+  const n = document.getElementById('u-nom').value.trim();
+  const ini = ((p[0] || '') + (n[0] || '')).toUpperCase();
+  av.textContent = ini || '?';
+  av.classList.add('pulse');
+  setTimeout(() => av.classList.remove('pulse'), 200);
+}
+
 function openUserModal(user = null) {
   const form = document.getElementById('formUser');
   form.reset();
@@ -2047,6 +2065,9 @@ function openUserModal(user = null) {
   const isEdit = !!user;
 
   document.getElementById('userModalTitle').textContent = isEdit ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur';
+  document.getElementById('userModalSubtitle').textContent = isEdit
+    ? 'Mets à jour les informations du compte'
+    : 'Créer un compte avec téléphone + mot de passe';
   document.getElementById('userSubmit').textContent = isEdit ? 'Enregistrer' : 'Créer le compte';
 
   // Mot de passe : requis seulement à la création
@@ -2059,16 +2080,36 @@ function openUserModal(user = null) {
     document.getElementById('u-prenom').value = user.prenom || '';
     document.getElementById('u-nom').value = user.nom || '';
     document.getElementById('u-telephone').value = user.telephone || '';
-    document.getElementById('u-role').value = user.role || 'agent';
+    setUserModalRole(user.role || 'agent');
   } else {
-    document.getElementById('u-role').value = 'agent';
+    setUserModalRole('agent');
   }
 
+  updateUserModalAvatar();
   userError.textContent = '';
   userModal.style.display = 'flex';
   setTimeout(() => document.getElementById('u-prenom').focus(), 50);
 }
 function closeUserModal() { userModal.style.display = 'none'; editingUserId = null; }
+
+// Branchements UX : avatar live + radios + générateur mot de passe + ESC + clic backdrop
+document.getElementById('u-prenom')?.addEventListener('input', updateUserModalAvatar);
+document.getElementById('u-nom')?.addEventListener('input', updateUserModalAvatar);
+document.querySelectorAll('input[name="u-role-radio"]').forEach(r => {
+  r.addEventListener('change', () => { if (r.checked) document.getElementById('u-role').value = r.value; });
+});
+document.getElementById('u-password-gen')?.addEventListener('click', () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let pwd = '';
+  for (let i = 0; i < 8; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  document.getElementById('u-password').value = pwd;
+});
+userModal?.addEventListener('click', (e) => {
+  if (e.target === userModal) closeUserModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && userModal && userModal.style.display === 'flex') closeUserModal();
+});
 
 document.getElementById('btnAddUser')?.addEventListener('click', () => openUserModal());
 document.getElementById('userModalClose')?.addEventListener('click', closeUserModal);
