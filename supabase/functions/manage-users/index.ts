@@ -201,8 +201,10 @@ async function handleCreate(admin: any, p: any) {
 }
 
 // ---------------------------------------------------------------------
-// update : modifie role/prenom/nom/actif (téléphone non modifiable ici)
-// payload : { id, role?, prenom?, nom?, actif? }
+// update : modifie role/prenom/nom/telephone/actif
+// payload : { id, role?, prenom?, nom?, telephone?, actif? }
+// Si le téléphone change, l'email auth synthétique {tel}@ultrawash.local
+// est aussi mis à jour pour rester cohérent avec le login.
 // ---------------------------------------------------------------------
 async function handleUpdate(admin: any, p: any) {
   const id = String(p.id || '')
@@ -219,6 +221,22 @@ async function handleUpdate(admin: any, p: any) {
   if (p.nom !== undefined) patch.nom = String(p.nom).trim()
   if (p.actif !== undefined) patch.actif = !!p.actif
 
+  let newPhone: string | null = null
+  if (p.telephone !== undefined) {
+    newPhone = normalizePhone(p.telephone)
+    if (!newPhone || newPhone.length < 7) {
+      return jsonResponse({ error: 'Téléphone invalide' }, 400)
+    }
+    const { data: dup } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('telephone', newPhone)
+      .neq('id', id)
+      .maybeSingle()
+    if (dup) return jsonResponse({ error: 'Ce téléphone est déjà utilisé' }, 409)
+    patch.telephone = newPhone
+  }
+
   const { data, error } = await admin
     .from('profiles')
     .update(patch)
@@ -227,6 +245,16 @@ async function handleUpdate(admin: any, p: any) {
     .maybeSingle()
   if (error) return jsonResponse({ error: error.message }, 500)
   if (!data) return jsonResponse({ error: 'Utilisateur introuvable' }, 404)
+
+  // Synchroniser l'email auth si le téléphone a changé
+  if (newPhone) {
+    const { error: emailErr } = await admin.auth.admin.updateUserById(id, {
+      email: emailFromPhone(newPhone),
+      email_confirm: true,
+      user_metadata: { telephone: newPhone, prenom: data.prenom, nom: data.nom },
+    })
+    if (emailErr) return jsonResponse({ error: 'Profil mis à jour mais email auth en échec : ' + emailErr.message }, 500)
+  }
 
   // Si on désactive : bannir au niveau auth pour invalider la session
   if (p.actif === false) {

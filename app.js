@@ -1978,6 +1978,7 @@ async function renderUsersPage() {
           </label>
         </div>
         <div class="user-card-actions">
+          <button class="btn-outline u-edit" title="Modifier prénom, nom, téléphone">✏️ Modifier</button>
           <button class="btn-outline u-pwd" title="Réinitialiser mot de passe">🔑 Mot de passe</button>
           <button class="btn-danger-sm u-del" title="Supprimer" ${isSelf ? 'disabled' : ''}>🗑️ Supprimer</button>
         </div>
@@ -2000,6 +2001,14 @@ async function renderUsersPage() {
       const r = await callManageUsers('update', { id, actif: chk.checked });
       if (r) toast(chk.checked ? 'Compte activé' : 'Compte désactivé');
       renderUsersPage();
+    });
+  });
+
+  grid.querySelectorAll('.u-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.closest('.user-card').dataset.id;
+      const u = users.find(x => x.id === id);
+      if (u) openUserModal(u);
     });
   });
 
@@ -2026,20 +2035,42 @@ async function renderUsersPage() {
   });
 }
 
-// Modale de création
+// Modale de création / édition
 const userModal = document.getElementById('userModal');
 const userError = document.getElementById('userError');
+let editingUserId = null;
 
-function openUserModal() {
-  document.getElementById('formUser').reset();
-  document.getElementById('u-role').value = 'agent';
+function openUserModal(user = null) {
+  const form = document.getElementById('formUser');
+  form.reset();
+  editingUserId = user ? user.id : null;
+  const isEdit = !!user;
+
+  document.getElementById('userModalTitle').textContent = isEdit ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur';
+  document.getElementById('userSubmit').textContent = isEdit ? 'Enregistrer' : 'Créer le compte';
+
+  // Mot de passe : requis seulement à la création
+  const pwdRow = document.getElementById('u-password-row');
+  const pwdInput = document.getElementById('u-password');
+  pwdRow.style.display = isEdit ? 'none' : '';
+  pwdInput.required = !isEdit;
+
+  if (isEdit) {
+    document.getElementById('u-prenom').value = user.prenom || '';
+    document.getElementById('u-nom').value = user.nom || '';
+    document.getElementById('u-telephone').value = user.telephone || '';
+    document.getElementById('u-role').value = user.role || 'agent';
+  } else {
+    document.getElementById('u-role').value = 'agent';
+  }
+
   userError.textContent = '';
   userModal.style.display = 'flex';
   setTimeout(() => document.getElementById('u-prenom').focus(), 50);
 }
-function closeUserModal() { userModal.style.display = 'none'; }
+function closeUserModal() { userModal.style.display = 'none'; editingUserId = null; }
 
-document.getElementById('btnAddUser')?.addEventListener('click', openUserModal);
+document.getElementById('btnAddUser')?.addEventListener('click', () => openUserModal());
 document.getElementById('userModalClose')?.addEventListener('click', closeUserModal);
 document.getElementById('userCancel')?.addEventListener('click', closeUserModal);
 
@@ -2048,17 +2079,29 @@ document.getElementById('formUser')?.addEventListener('submit', async (ev) => {
   userError.textContent = '';
   const submitBtn = document.getElementById('userSubmit');
   submitBtn.disabled = true;
-  const body = {
-    prenom: document.getElementById('u-prenom').value.trim(),
-    nom: document.getElementById('u-nom').value.trim(),
-    telephone: document.getElementById('u-telephone').value.trim(),
-    role: document.getElementById('u-role').value,
-    password: document.getElementById('u-password').value,
-  };
-  const r = await callManageUsers('create', body);
+
+  const isEdit = !!editingUserId;
+  let r;
+  if (isEdit) {
+    r = await callManageUsers('update', {
+      id: editingUserId,
+      prenom: document.getElementById('u-prenom').value.trim(),
+      nom: document.getElementById('u-nom').value.trim(),
+      telephone: document.getElementById('u-telephone').value.trim(),
+      role: document.getElementById('u-role').value,
+    });
+  } else {
+    r = await callManageUsers('create', {
+      prenom: document.getElementById('u-prenom').value.trim(),
+      nom: document.getElementById('u-nom').value.trim(),
+      telephone: document.getElementById('u-telephone').value.trim(),
+      role: document.getElementById('u-role').value,
+      password: document.getElementById('u-password').value,
+    });
+  }
   submitBtn.disabled = false;
   if (r) {
-    toast('Compte créé');
+    toast(isEdit ? 'Utilisateur mis à jour' : 'Compte créé');
     closeUserModal();
     renderUsersPage();
   }
