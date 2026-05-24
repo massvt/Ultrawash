@@ -2853,10 +2853,17 @@ document.getElementById('formResa').addEventListener('submit', async (ev) => {
   if (resaMode === 'existing') {
     const cid = document.getElementById('r-client-id').value;
     if (!cid) { toast('Sélectionne un client (ou bascule sur "Client de passage")', '#e53935'); return; }
+    const vid = document.getElementById('r-vehicule-id').value || null;
     row.client_id   = cid;
-    row.vehicule_id = document.getElementById('r-vehicule-id').value || null;
-    // Reset des champs passage
-    row.client_nom = null; row.client_telephone = null; row.plaque = null; row.vehicule_type = null;
+    row.vehicule_id = vid;
+    // Snapshot : on fige nom/tel/plaque/type dans la ligne résa pour
+    // que l'historique reste lisible si le client/véhicule est supprimé.
+    const c = cache.clients.find(x => x.id === cid) || null;
+    const v = vid ? cache.vehicules.find(x => x.id === vid) || null : null;
+    row.client_nom        = c ? c.nom : null;
+    row.client_telephone  = c ? (c.telephone || null) : null;
+    row.plaque            = v ? v.plaque : null;
+    row.vehicule_type     = null;
   } else {
     const nom = document.getElementById('r-client-nom').value.trim();
     if (!nom) { toast('Nom du client requis', '#e53935'); return; }
