@@ -36,18 +36,26 @@ create index if not exists reservations_date_idx     on public.reservations (dat
 create index if not exists reservations_statut_idx   on public.reservations (statut);
 create index if not exists reservations_client_idx   on public.reservations (client_id);
 
+-- Anti-conflit: un seul créneau "prevu" par date+heure (filet côté DB
+-- en plus du check front, pour couvrir les insertions concurrentes).
+drop index if exists public.reservations_creneau_unique;
+create unique index reservations_creneau_unique
+  on public.reservations (date_prevue, heure_prevue)
+  where statut = 'prevu';
+
 
 -- ---------------------------------------------------------------------
--- 2) RLS — reservations
---    SELECT / INSERT / UPDATE : tout authentifié (patron + employés)
---    DELETE : patron uniquement
+-- 2) RLS — reservations (rôles refondus 2026-04-27)
+--    SELECT / INSERT / UPDATE : tout authentifié (agent + admin + super_admin)
+--    DELETE : admin ou super_admin uniquement
 -- ---------------------------------------------------------------------
 alter table public.reservations enable row level security;
 
-drop policy if exists "reservations_select_auth"   on public.reservations;
-drop policy if exists "reservations_insert_auth"   on public.reservations;
-drop policy if exists "reservations_update_auth"   on public.reservations;
-drop policy if exists "reservations_delete_patron" on public.reservations;
+drop policy if exists "reservations_select_auth"        on public.reservations;
+drop policy if exists "reservations_insert_auth"        on public.reservations;
+drop policy if exists "reservations_update_auth"        on public.reservations;
+drop policy if exists "reservations_delete_patron"      on public.reservations;
+drop policy if exists "reservations_delete_admin"       on public.reservations;
 
 create policy "reservations_select_auth" on public.reservations
   for select to authenticated using (true);
@@ -59,9 +67,9 @@ create policy "reservations_update_auth" on public.reservations
   for update to authenticated
   using (true) with check (true);
 
-create policy "reservations_delete_patron" on public.reservations
+create policy "reservations_delete_admin" on public.reservations
   for delete to authenticated
-  using (public.uw_current_role() = 'patron');
+  using (public.uw_is_admin_or_above());
 
 
 -- ---------------------------------------------------------------------

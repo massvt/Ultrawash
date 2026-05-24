@@ -2646,11 +2646,12 @@ async function onResaAction(action, id) {
 }
 
 async function convertResaToEntree(r) {
-  // Construit la ligne entree à partir de la résa
+  // L'entrée est datée du moment réel d'arrivée, pas du créneau prévu :
+  // sinon une résa marquée "arrivé" en retard fausse le CA du jour.
   const now = new Date();
   const row = {
-    date: r.date_prevue,
-    heure: (r.heure_prevue || now.toTimeString().slice(0,5)).slice(0,5),
+    date: todayYmd(),
+    heure: now.toTimeString().slice(0,5),
     vehicule: r.vehicule_type || 'Voiture',
     type: r.type_lavage || 'Lavage simple',
     montant: Number(r.montant_estime || 0),
