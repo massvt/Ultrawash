@@ -2561,7 +2561,61 @@ async function loadClosedDays() {
   return closedDaysSet;
 }
 
-// Liste éditable dans la modale Réglages
+// ----- Gestion des jours fermés : mini-calendrier multi-sélection -----
+let bscYear, bscMonth;
+
+function renderClosedDow() {
+  document.getElementById('bsc-dow').innerHTML = RESA_DOW.map(d => `<div class="bsc-dow">${d}</div>`).join('');
+}
+
+function renderClosedCal() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  document.getElementById('bsc-month').textContent = `${RESA_MONTHS[bscMonth]} ${bscYear}`;
+  document.getElementById('bsc-prev').disabled = (bscYear === today.getFullYear() && bscMonth === today.getMonth());
+  const first = new Date(bscYear, bscMonth, 1);
+  const lead = (first.getDay() + 6) % 7;
+  const days = new Date(bscYear, bscMonth + 1, 0).getDate();
+  let cells = '';
+  for (let i = 0; i < lead; i++) cells += '<div class="bsc-day empty"></div>';
+  for (let d = 1; d <= days; d++) {
+    const date = new Date(bscYear, bscMonth, d);
+    const key = ymd(date);
+    const isPast = date < today;
+    const cls = ['bsc-day'];
+    if (isPast) cls.push('past');
+    if (closedDaysSet.has(key)) cls.push('closed');
+    if (date.getTime() === today.getTime()) cls.push('today');
+    cells += `<div class="${cls.join(' ')}" ${isPast ? '' : `data-day="${key}"`}>${d}</div>`;
+  }
+  const grid = document.getElementById('bsc-grid');
+  grid.innerHTML = cells;
+  grid.querySelectorAll('[data-day]').forEach(el =>
+    el.addEventListener('click', () => toggleClosedDay(el.dataset.day)));
+}
+
+// Bascule un jour : fermé ⇄ ouvert (clic sur le calendrier ou ✕ de la liste)
+async function toggleClosedDay(key) {
+  if (closedDaysSet.has(key)) {
+    const { error } = await sb.from('booking_closed_days').delete().eq('day', key);
+    if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
+    closedDaysSet.delete(key);
+    toast(`${fmtDate(key)} rouvert`, '#0d9e6e');
+  } else {
+    const reason = document.getElementById('bs-day-reason').value.trim() || null;
+    const { error } = await sb.from('booking_closed_days').insert({ day: key, reason });
+    if (error && error.code !== '23505') {
+      if (error.code === '42501' || /row-level/i.test(error.message)) toast('Action réservée aux administrateurs', '#e53935');
+      else toast('Erreur : ' + error.message, '#e53935');
+      return;
+    }
+    closedDaysSet.add(key);
+    toast(`${fmtDate(key)} fermé`, '#f59e0b');
+  }
+  renderClosedCal();
+  renderClosedDays();
+}
+
+// Récap des jours fermés à venir (sous le calendrier)
 async function renderClosedDays() {
   const wrap = document.getElementById('bs-day-list');
   if (!wrap) return;
@@ -2577,34 +2631,17 @@ async function renderClosedDays() {
       <button type="button" class="btn-mini btn-del" data-day="${d.day}" title="Rouvrir ce jour">✕</button>
     </div>`).join('');
   wrap.querySelectorAll('[data-day]').forEach(b =>
-    b.addEventListener('click', () => removeClosedDay(b.dataset.day)));
+    b.addEventListener('click', () => toggleClosedDay(b.dataset.day)));
 }
 
-async function removeClosedDay(day) {
-  const { error } = await sb.from('booking_closed_days').delete().eq('day', day);
-  if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
-  await loadClosedDays();
-  renderClosedDays();
-  toast('Jour rouvert', '#0d9e6e');
-}
-
-document.getElementById('bs-day-add').addEventListener('click', async () => {
-  const day = document.getElementById('bs-day').value;
-  const reason = document.getElementById('bs-day-reason').value.trim() || null;
-  if (!day) { toast('Choisis une date', '#e53935'); return; }
-  if (day < todayYmd()) { toast('Choisis une date à venir', '#e53935'); return; }
-  const { error } = await sb.from('booking_closed_days').insert({ day, reason });
-  if (error) {
-    if (error.code === '23505') toast('Ce jour est déjà fermé', '#f59e0b');
-    else if (error.code === '42501' || /row-level/i.test(error.message)) toast('Action réservée aux administrateurs', '#e53935');
-    else toast('Erreur : ' + error.message, '#e53935');
-    return;
-  }
-  document.getElementById('bs-day').value = '';
-  document.getElementById('bs-day-reason').value = '';
-  await loadClosedDays();
-  renderClosedDays();
-  toast('Jour fermé ajouté', '#0d9e6e');
+document.getElementById('bsc-prev').addEventListener('click', () => {
+  if (document.getElementById('bsc-prev').disabled) return;
+  bscMonth--; if (bscMonth < 0) { bscMonth = 11; bscYear--; }
+  renderClosedCal();
+});
+document.getElementById('bsc-next').addEventListener('click', () => {
+  bscMonth++; if (bscMonth > 11) { bscMonth = 0; bscYear++; }
+  renderClosedCal();
 });
 
 // Réglages réservation (horaires + capacité), avec valeurs par défaut
@@ -2634,28 +2671,53 @@ function refreshBookingToggle() {
   btn.classList.toggle('btn-outline', open);
 }
 
-document.getElementById('btnBookingToggle').addEventListener('click', async () => {
-  await loadBookingConfig();
+// Met à jour l'interrupteur de la modale Réglages
+function updateBsStateSwitch() {
+  const sw = document.getElementById('bsStateSwitch');
+  if (!sw) return;
   const open = cache.bookingConfig ? cache.bookingConfig.is_open : true;
-  const next = !open;
-  if (!confirm(next
-    ? 'Rouvrir les réservations en ligne pour les clients ?'
-    : 'Fermer les réservations en ligne ? (les clients ne pourront plus réserver via le lien public)')) return;
-  // On vérifie que la ligne a bien été modifiée (sinon = droits insuffisants côté RLS)
+  sw.classList.toggle('on', open);
+  sw.setAttribute('aria-checked', open ? 'true' : 'false');
+  const sub = document.getElementById('bsStateSub');
+  if (sub) sub.textContent = open
+    ? 'Ouvertes — les clients peuvent réserver via le lien.'
+    : 'Fermées — le lien public affiche un message d’indisponibilité.';
+}
+
+// Écrit le nouvel état en base + rafraîchit l'UI (renvoie true si OK)
+async function setBookingOpen(next) {
   const { data, error } = await sb.from('booking_config')
     .update({ is_open: next, updated_at: new Date().toISOString() })
     .eq('id', true)
     .select();
-  if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
+  if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
   if (!data || data.length === 0) {
     toast('Modification refusée — droits administrateur requis.', '#e53935');
-    return;
+    return false;
   }
   cache.bookingConfig = data[0];
   refreshBookingToggle();
-  toast(next ? 'Réservations en ligne rouvertes' : 'Réservations en ligne fermées',
-        next ? '#0d9e6e' : '#f59e0b');
-});
+  updateBsStateSwitch();
+  return true;
+}
+
+// Bascule ouvert/fermé (utilisé par le bouton header ET l'interrupteur de la modale)
+async function toggleBookingOpen() {
+  await loadBookingConfig();
+  const open = cache.bookingConfig ? cache.bookingConfig.is_open : true;
+  const next = !open;
+  if (!next && !confirm('Fermer les réservations en ligne ? Les clients ne pourront plus réserver via le lien public.')) {
+    updateBsStateSwitch(); // remet l'interrupteur dans son état réel
+    return;
+  }
+  if (await setBookingOpen(next)) {
+    toast(next ? 'Réservations en ligne rouvertes' : 'Réservations en ligne fermées',
+          next ? '#0d9e6e' : '#f59e0b');
+  }
+}
+
+document.getElementById('btnBookingToggle').addEventListener('click', toggleBookingOpen);
+document.getElementById('bsStateSwitch').addEventListener('click', toggleBookingOpen);
 
 // ----- Modale de réglages (horaires + capacité) -----
 const bookingSettingsModal = document.getElementById('bookingSettingsModal');
@@ -2667,6 +2729,12 @@ document.getElementById('btnBookingSettings').addEventListener('click', async ()
   document.getElementById('bs-close').value    = Number.isFinite(c.close_hour)   ? c.close_hour   : 19;
   document.getElementById('bs-step').value     = String(Number.isFinite(c.slot_minutes) ? c.slot_minutes : 60);
   document.getElementById('bs-capacity').value = Number.isFinite(c.capacity)     ? c.capacity     : 1;
+  updateBsStateSwitch();
+  await loadClosedDays();
+  const t = new Date();
+  bscYear = t.getFullYear(); bscMonth = t.getMonth();
+  renderClosedDow();
+  renderClosedCal();
   renderClosedDays();
   bookingSettingsModal.classList.add('show');
 });

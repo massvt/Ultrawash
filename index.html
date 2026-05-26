@@ -887,51 +887,76 @@
 
   <!-- MODAL RÉGLAGES RÉSERVATION (admin) -->
   <div id="bookingSettingsModal" class="modal-overlay">
-    <div class="modal-card">
+    <div class="modal-card modal-card-lg">
       <div class="modal-header">
         <h3>Réglages des réservations</h3>
         <button type="button" class="modal-close" id="bsClose" aria-label="Fermer">✕</button>
       </div>
-      <form id="formBookingSettings" class="modal-form active">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Heure d'ouverture</label>
-            <input type="number" id="bs-open" min="0" max="23" step="1" />
-          </div>
-          <div class="form-group">
-            <label>Heure de fermeture</label>
-            <input type="number" id="bs-close" min="1" max="24" step="1" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Durée d'un créneau</label>
-            <select id="bs-step">
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">1 heure</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Voitures par créneau</label>
-            <input type="number" id="bs-capacity" min="1" max="20" step="1" />
-          </div>
-        </div>
-        <p class="resa-client-note">Ces réglages s'appliquent à la réservation en ligne (lien client) et au calendrier interne.</p>
-        <div class="modal-actions">
-          <button type="button" class="btn-outline" id="bsCancel">Annuler</button>
-          <button type="submit" class="btn-primary">Enregistrer</button>
-        </div>
-      </form>
+      <div class="modal-form active">
 
-      <div class="bs-section">
-        <h4>Jours fermés (off / fériés)</h4>
-        <div class="bs-add-day">
-          <input type="date" id="bs-day" />
-          <input type="text" id="bs-day-reason" placeholder="Motif (optionnel)" />
-          <button type="button" class="btn-outline" id="bs-day-add">Ajouter</button>
+        <!-- État global des réservations en ligne -->
+        <div class="bs-switch-row">
+          <div class="bs-switch-text">
+            <div class="bs-switch-title">Réservations en ligne</div>
+            <div class="bs-switch-sub" id="bsStateSub">—</div>
+          </div>
+          <button type="button" class="switch" id="bsStateSwitch" role="switch" aria-checked="true">
+            <span class="switch-knob"></span>
+          </button>
         </div>
-        <div id="bs-day-list" class="bs-day-list"></div>
+
+        <!-- Horaires & capacité -->
+        <form id="formBookingSettings">
+          <h4 class="bs-h4">🕒 Horaires &amp; capacité</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Heure d'ouverture</label>
+              <input type="number" id="bs-open" min="0" max="23" step="1" />
+            </div>
+            <div class="form-group">
+              <label>Heure de fermeture</label>
+              <input type="number" id="bs-close" min="1" max="24" step="1" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Durée d'un créneau</label>
+              <select id="bs-step">
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 heure</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Voitures par créneau</label>
+              <input type="number" id="bs-capacity" min="1" max="20" step="1" />
+            </div>
+          </div>
+          <div class="modal-actions" style="margin-top:6px">
+            <button type="submit" class="btn-primary">Enregistrer les horaires</button>
+          </div>
+        </form>
+
+        <!-- Jours fermés : calendrier multi-sélection -->
+        <div class="bs-block">
+          <h4 class="bs-h4">🚫 Jours fermés (off / fériés)</h4>
+          <p class="resa-client-note">Cliquez sur un ou plusieurs jours pour les <b>fermer</b> ; recliquez pour les rouvrir.</p>
+          <div class="form-group">
+            <label>Motif (optionnel, appliqué aux jours fermés)</label>
+            <input type="text" id="bs-day-reason" placeholder="ex: Férié, congé…" />
+          </div>
+          <div class="bsc-cal">
+            <div class="bsc-head">
+              <button type="button" class="cal-nav-mini" id="bsc-prev" aria-label="Mois précédent">‹</button>
+              <span class="bsc-month" id="bsc-month"></span>
+              <button type="button" class="cal-nav-mini" id="bsc-next" aria-label="Mois suivant">›</button>
+            </div>
+            <div class="bsc-grid" id="bsc-dow"></div>
+            <div class="bsc-grid" id="bsc-grid"></div>
+          </div>
+          <div id="bs-day-list" class="bs-day-list"></div>
+        </div>
+
       </div>
     </div>
   </div>

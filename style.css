@@ -999,6 +999,38 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .bs-day-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: #f8fafc; border: 1px solid var(--gray-100); border-radius: 8px; padding: 8px 12px; font-size: .9rem; }
 
+/* Modale réglages : interrupteur + sections */
+.modal-card-lg { max-width: 480px; }
+.bs-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #f8fafc; border: 1px solid var(--gray-100); border-radius: 12px; padding: 14px 16px; margin-bottom: 6px; }
+.bs-switch-title { font-weight: 700; color: var(--text); }
+.bs-switch-sub { font-size: .82rem; color: var(--gray-400); margin-top: 2px; }
+.switch { position: relative; width: 50px; height: 28px; border-radius: 999px; border: none; background: #cbd5e1;
+  cursor: pointer; flex: none; transition: background .18s; padding: 0; }
+.switch.on { background: var(--green); }
+.switch-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: left .18s; }
+.switch.on .switch-knob { left: 25px; }
+.bs-h4 { margin: 18px 0 12px; font-size: .95rem; color: var(--text); }
+.bs-block { border-top: 1px solid var(--gray-100); margin-top: 18px; padding-top: 6px; }
+
+/* Mini-calendrier des jours fermés */
+.bsc-cal { border: 1px solid var(--gray-100); border-radius: 12px; padding: 10px; margin-bottom: 12px; }
+.bsc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.bsc-month { font-weight: 700; text-transform: capitalize; }
+.cal-nav-mini { width: 30px; height: 30px; border: 1px solid var(--gray-100); background: #fff; border-radius: 8px;
+  cursor: pointer; font-size: 1rem; line-height: 1; }
+.cal-nav-mini:disabled { opacity: .35; cursor: not-allowed; }
+.bsc-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.bsc-dow { text-align: center; font-size: .66rem; font-weight: 700; color: var(--gray-400); text-transform: uppercase; }
+.bsc-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px;
+  background: #f1f5f9; cursor: pointer; font-size: .88rem; font-weight: 600; border: 1.5px solid transparent; transition: .12s; }
+.bsc-day.empty { background: transparent; cursor: default; }
+.bsc-day.past { color: #cbd5e1; background: transparent; cursor: not-allowed; font-weight: 400; }
+.bsc-day.today { box-shadow: inset 0 0 0 1.5px var(--blue); }
+.bsc-day.closed { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+.bsc-day:not(.empty):not(.past):not(.closed):hover { border-color: var(--blue); }
+
 .resa-selected { margin-top: 8px; }
 .resa-selected-card {
   background: #ecfdf5;
