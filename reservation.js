@@ -78,11 +78,21 @@ $('calNext').addEventListener('click', () => {
   renderCalendar();
 });
 
+// ---------- Fil d'étapes ----------
+function setStep(n) {
+  document.querySelectorAll('#stepper .step').forEach(el => {
+    const s = Number(el.dataset.step);
+    el.classList.toggle('is-active', s === n);
+    el.classList.toggle('is-done', s < n);
+  });
+}
+
 // ---------- Créneaux ----------
 async function selectDate(key) {
   state.date = key;
   state.heure = null;
   renderCalendar();
+  setStep(2);
   $('cardForm').classList.add('hidden');
   $('cardSlots').classList.remove('hidden');
   $('slotsEmpty').classList.add('hidden');
@@ -121,10 +131,17 @@ function selectSlot(h) {
 // ---------- Formulaire ----------
 function openForm() {
   updateRecap();
+  setStep(3);
   $('cardForm').classList.remove('hidden');
   $('formError').classList.add('hidden');
   $('cardForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// Lien « Changer la date ou le créneau » → revient à l'étape 1
+$('recapEdit').addEventListener('click', () => {
+  setStep(1);
+  $('cardDate').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 // Libellé complet de la prestation : "Lavage <type>" (ex: "Lavage 4x4")
 function serviceLabel(type) {
@@ -191,6 +208,7 @@ function showError(msg) {
 
 function showConfirmation() {
   const type = $('f-vehtype').value;
+  setStep(4); // toutes les étapes terminées
   $('flow').classList.add('hidden');
   $('confirm').classList.remove('hidden');
   $('confirmDetail').innerHTML =
@@ -206,6 +224,7 @@ $('againBtn').addEventListener('click', () => {
   $('flow').classList.remove('hidden');
   $('cardSlots').classList.add('hidden');
   $('cardForm').classList.add('hidden');
+  setStep(1);
   viewYear = today.getFullYear(); viewMonth = today.getMonth();
   renderCalendar();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -216,11 +235,14 @@ async function boot() {
   renderDow();
   renderCalendar();
 
+  setStep(1);
+
   // Réservations fermées par l'équipe (forte affluence) ?
   const { data: status } = await sb.rpc('public_booking_status');
   const st = status && status[0];
   if (st && st.is_open === false) {
     $('flow').classList.add('hidden');
+    $('stepper').classList.add('hidden');
     $('closedMessage').textContent = st.closed_message || 'Les réservations en ligne sont momentanément fermées.';
     $('closedBanner').classList.remove('hidden');
     return;
