@@ -352,7 +352,10 @@ const DB = {
 
   async addClient(row) {
     const { data, error } = await sb.from('clients').insert(row).select().single();
-    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (error) {
+      toast(error.code === '23505' ? 'Ce numéro de téléphone est déjà attribué à un client' : 'Erreur : ' + error.message, '#e53935');
+      return null;
+    }
     cache.clients.push(data);
     cache.clients.sort((a, b) => a.nom.localeCompare(b.nom));
     return data;
@@ -360,7 +363,10 @@ const DB = {
 
   async updateClient(id, row) {
     const { data, error } = await sb.from('clients').update(row).eq('id', id).select().single();
-    if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
+    if (error) {
+      toast(error.code === '23505' ? 'Ce numéro de téléphone est déjà attribué à un client' : 'Erreur : ' + error.message, '#e53935');
+      return null;
+    }
     const i = cache.clients.findIndex(c => c.id === id);
     if (i !== -1) cache.clients[i] = data;
     return data;
@@ -2503,6 +2509,19 @@ guardedSubmit(document.getElementById('formClient'), async (ev) => {
     adresse:   document.getElementById('cl-adresse').value.trim() || null,
     notes:     document.getElementById('cl-notes').value.trim() || null,
   };
+
+  // Téléphone unique : refuser s'il est déjà attribué à un autre client
+  if (row.telephone) {
+    let dup = cache.clients.find(c => c.telephone === row.telephone && c.id !== editingClientId);
+    if (!dup) {
+      let q = sb.from('clients').select('id, nom').eq('telephone', row.telephone);
+      if (editingClientId) q = q.neq('id', editingClientId);
+      const { data } = await q.limit(1);
+      if (data && data[0]) dup = data[0];
+    }
+    if (dup) { toast(`Numéro déjà utilisé par « ${dup.nom} »`, '#e53935'); return; }
+  }
+
   let client;
   if (editingClientId) {
     client = await DB.updateClient(editingClientId, row);
