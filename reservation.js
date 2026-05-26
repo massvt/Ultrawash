@@ -12,6 +12,9 @@ const DOW = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 // État de la réservation en cours
 const state = { date: null, heure: null, services: [] };
 
+// Jours fermés (off / fériés), 'YYYY-MM-DD'
+let closedDays = new Set();
+
 // Aujourd'hui (heure locale du navigateur) à minuit
 const today = new Date(); today.setHours(0, 0, 0, 0);
 let viewYear = today.getFullYear();
@@ -54,13 +57,17 @@ function renderCalendar() {
     const date = new Date(viewYear, viewMonth, d);
     const key = ymd(date);
     const isPast = date < today;
+    const isClosed = closedDays.has(key);
     const isToday = date.getTime() === today.getTime();
     const isSel = state.date === key;
+    const blocked = isPast || isClosed;
     const cls = ['cal-day'];
     if (isPast) cls.push('past');
+    if (isClosed) cls.push('off');
     if (isToday) cls.push('today');
     if (isSel) cls.push('selected');
-    cells += `<div class="${cls.join(' ')}" ${isPast ? '' : `data-date="${key}"`}>${d}</div>`;
+    const title = isClosed ? ' title="Fermé"' : '';
+    cells += `<div class="${cls.join(' ')}"${title} ${blocked ? '' : `data-date="${key}"`}>${d}</div>`;
   }
   $('calGrid').innerHTML = cells;
   $('calGrid').querySelectorAll('[data-date]').forEach(el => {
@@ -247,6 +254,11 @@ async function boot() {
     $('closedBanner').classList.remove('hidden');
     return;
   }
+
+  // Jours fermés (off / fériés) → grisés dans le calendrier
+  const { data: closed } = await sb.rpc('public_closed_days');
+  closedDays = new Set((closed || []).map(c => c.day));
+  renderCalendar();
 
   const { data: vt } = await sb.rpc('public_vehicule_types');
 

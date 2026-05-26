@@ -2508,6 +2508,7 @@ let editingResaId = null;
 const RESA_MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const RESA_DOW = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 let resaCalYear, resaCalMonth;
+let closedDaysSet = new Set(); // jours fermés (off / fériés), 'YYYY-MM-DD'
 
 function todayYmd() { return ymd(new Date()); }
 
@@ -2548,9 +2549,63 @@ async function renderReservationsPage() {
   // Pour la recherche client dans la modale, on lazy-load les clients aussi
   if (!cache.clientsLoaded) await DB.loadClients();
   await loadBookingConfig();
+  await loadClosedDays();
   renderReservationsList();
   refreshBookingToggle();
 }
+
+// Jours fermés (off / fériés) — chargés dans un Set pour le calendrier interne
+async function loadClosedDays() {
+  const { data } = await sb.from('booking_closed_days').select('day').gte('day', todayYmd());
+  closedDaysSet = new Set((data || []).map(r => r.day));
+  return closedDaysSet;
+}
+
+// Liste éditable dans la modale Réglages
+async function renderClosedDays() {
+  const wrap = document.getElementById('bs-day-list');
+  if (!wrap) return;
+  const { data } = await sb.from('booking_closed_days').select('*').gte('day', todayYmd()).order('day');
+  const list = data || [];
+  if (!list.length) {
+    wrap.innerHTML = '<p class="resa-client-note" style="margin:0">Aucun jour fermé à venir.</p>';
+    return;
+  }
+  wrap.innerHTML = list.map(d => `
+    <div class="bs-day-row">
+      <span><b>${fmtDate(d.day)}</b>${d.reason ? ' · ' + escapeHtml(d.reason) : ''}</span>
+      <button type="button" class="btn-mini btn-del" data-day="${d.day}" title="Rouvrir ce jour">✕</button>
+    </div>`).join('');
+  wrap.querySelectorAll('[data-day]').forEach(b =>
+    b.addEventListener('click', () => removeClosedDay(b.dataset.day)));
+}
+
+async function removeClosedDay(day) {
+  const { error } = await sb.from('booking_closed_days').delete().eq('day', day);
+  if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
+  await loadClosedDays();
+  renderClosedDays();
+  toast('Jour rouvert', '#0d9e6e');
+}
+
+document.getElementById('bs-day-add').addEventListener('click', async () => {
+  const day = document.getElementById('bs-day').value;
+  const reason = document.getElementById('bs-day-reason').value.trim() || null;
+  if (!day) { toast('Choisis une date', '#e53935'); return; }
+  if (day < todayYmd()) { toast('Choisis une date à venir', '#e53935'); return; }
+  const { error } = await sb.from('booking_closed_days').insert({ day, reason });
+  if (error) {
+    if (error.code === '23505') toast('Ce jour est déjà fermé', '#f59e0b');
+    else if (error.code === '42501' || /row-level/i.test(error.message)) toast('Action réservée aux administrateurs', '#e53935');
+    else toast('Erreur : ' + error.message, '#e53935');
+    return;
+  }
+  document.getElementById('bs-day').value = '';
+  document.getElementById('bs-day-reason').value = '';
+  await loadClosedDays();
+  renderClosedDays();
+  toast('Jour fermé ajouté', '#0d9e6e');
+});
 
 // Réglages réservation (horaires + capacité), avec valeurs par défaut
 async function loadBookingConfig() {
@@ -2612,6 +2667,7 @@ document.getElementById('btnBookingSettings').addEventListener('click', async ()
   document.getElementById('bs-close').value    = Number.isFinite(c.close_hour)   ? c.close_hour   : 19;
   document.getElementById('bs-step').value     = String(Number.isFinite(c.slot_minutes) ? c.slot_minutes : 60);
   document.getElementById('bs-capacity').value = Number.isFinite(c.capacity)     ? c.capacity     : 1;
+  renderClosedDays();
   bookingSettingsModal.classList.add('show');
 });
 document.getElementById('bsClose').addEventListener('click', closeBookingSettings);
@@ -2863,11 +2919,15 @@ function renderResaCal() {
     const date = new Date(resaCalYear, resaCalMonth, d);
     const key = ymd(date);
     const isPast = date < today;
+    const isClosed = closedDaysSet.has(key);
+    const blocked = isPast || isClosed;
     const cls = ['resa-cal-day'];
     if (isPast) cls.push('past');
+    if (isClosed) cls.push('off');
     if (date.getTime() === today.getTime()) cls.push('today');
     if (key === selected) cls.push('selected');
-    cells += `<div class="${cls.join(' ')}" ${isPast ? '' : `data-date="${key}"`}>${d}</div>`;
+    const title = isClosed ? ' title="Jour fermé"' : '';
+    cells += `<div class="${cls.join(' ')}"${title} ${blocked ? '' : `data-date="${key}"`}>${d}</div>`;
   }
   const grid = document.getElementById('r-cal-grid');
   grid.innerHTML = cells;
@@ -2891,6 +2951,14 @@ function resetResaSlots() {
 }
 
 function renderResaSlots(dateStr) {
+  // Jour fermé (off / férié) → aucun créneau
+  if (closedDaysSet.has(dateStr)) {
+    document.getElementById('r-slots').innerHTML = '';
+    const h = document.getElementById('r-slots-hint');
+    h.textContent = 'Jour fermé (off / férié) — aucun créneau.';
+    h.style.display = '';
+    return;
+  }
   const cfg = bookingCfg();
   const startMin = cfg.open * 60, endMin = cfg.close * 60;
   const step = Math.max(cfg.step, 5), cap = Math.max(cfg.cap, 1);
