@@ -1050,7 +1050,14 @@ document.getElementById('e-telephone').addEventListener('input', (ev) => {
 });
 
 function renderEntreesList() {
-  const { slice, page, totalPages, total } = paginate(DB.getEntrees(), 'entrees');
+  const from = document.getElementById('el-from').value;
+  const to   = document.getElementById('el-to').value;
+  const tel  = document.getElementById('el-tel').value.trim().toLowerCase();
+  let list = DB.getEntrees();
+  if (from) list = list.filter(e => e.date >= from);
+  if (to)   list = list.filter(e => e.date <= to);
+  if (tel)  list = list.filter(e => (e.telephone || '').toLowerCase().includes(tel));
+  const { slice, page, totalPages, total } = paginate(list, 'entrees');
   const tbody = document.getElementById('entreesList');
   const canDelete = isAdmin();
   tbody.innerHTML = slice.map(e => `
@@ -1065,6 +1072,16 @@ function renderEntreesList() {
   `).join('') || '<tr><td colspan="6" class="empty-state">Aucun lavage enregistré</td></tr>';
   renderPager('entreesPager', 'entrees', total, page, totalPages, renderEntreesList);
 }
+
+['el-from', 'el-to', 'el-tel'].forEach(id =>
+  document.getElementById(id).addEventListener('input', withPageReset('entrees', renderEntreesList)));
+document.getElementById('el-reset').addEventListener('click', () => {
+  document.getElementById('el-from').value = '';
+  document.getElementById('el-to').value = '';
+  document.getElementById('el-tel').value = '';
+  pagers.entrees = 1;
+  renderEntreesList();
+});
 
 async function delEntree(id) {
   if (!confirm('Supprimer cette entrée ?')) return;
@@ -1093,7 +1110,12 @@ guardedSubmit(document.getElementById('formSortie'), async (ev) => {
 });
 
 function renderSortiesList() {
-  const { slice, page, totalPages, total } = paginate(DB.getSorties(), 'sorties');
+  const from = document.getElementById('sl-from').value;
+  const to   = document.getElementById('sl-to').value;
+  let list = DB.getSorties();
+  if (from) list = list.filter(s => s.date >= from);
+  if (to)   list = list.filter(s => s.date <= to);
+  const { slice, page, totalPages, total } = paginate(list, 'sorties');
   const tbody = document.getElementById('sortiesList');
   tbody.innerHTML = slice.map(s => `
     <tr>
@@ -1106,6 +1128,15 @@ function renderSortiesList() {
   `).join('') || '<tr><td colspan="5" class="empty-state">Aucune dépense enregistrée</td></tr>';
   renderPager('sortiesPager', 'sorties', total, page, totalPages, renderSortiesList);
 }
+
+['sl-from', 'sl-to'].forEach(id =>
+  document.getElementById(id).addEventListener('input', withPageReset('sorties', renderSortiesList)));
+document.getElementById('sl-reset').addEventListener('click', () => {
+  document.getElementById('sl-from').value = '';
+  document.getElementById('sl-to').value = '';
+  pagers.sorties = 1;
+  renderSortiesList();
+});
 
 async function delSortie(id) {
   if (!confirm('Supprimer cette dépense ?')) return;

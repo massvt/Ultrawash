@@ -238,6 +238,12 @@
 
       <div class="list-section">
         <h3>Entrées récentes</h3>
+        <div class="filter-bar">
+          <div class="filter-group"><label>Du</label><input type="date" id="el-from" /></div>
+          <div class="filter-group"><label>Au</label><input type="date" id="el-to" /></div>
+          <div class="filter-group" style="flex:1;min-width:150px"><label>Téléphone</label><input type="text" id="el-tel" placeholder="ex: 77…" /></div>
+          <div class="filter-group filter-reset"><label>&nbsp;</label><button type="button" class="btn-outline" id="el-reset">Réinitialiser</button></div>
+        </div>
         <div class="table-wrap"><table class="table">
           <thead>
             <tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Téléphone</th><th>Montant</th><th></th></tr>
@@ -289,6 +295,11 @@
 
       <div class="list-section">
         <h3>Dépenses récentes</h3>
+        <div class="filter-bar">
+          <div class="filter-group"><label>Du</label><input type="date" id="sl-from" /></div>
+          <div class="filter-group"><label>Au</label><input type="date" id="sl-to" /></div>
+          <div class="filter-group filter-reset"><label>&nbsp;</label><button type="button" class="btn-outline" id="sl-reset">Réinitialiser</button></div>
+        </div>
         <div class="table-wrap"><table class="table">
           <thead>
             <tr><th>Date</th><th>Catégorie</th><th>Description</th><th>Montant</th><th></th></tr>
