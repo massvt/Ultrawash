@@ -9,7 +9,7 @@ const isAdmin = () => session.role === 'admin' || session.role === 'super_admin'
 const isSuperAdmin = () => session.role === 'super_admin';
 
 // In-memory cache (rempli au chargement, mis à jour après chaque mutation)
-const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], vehiculeTypes: [], serviceCategories: [], vehiculeCategories: [], clientsLoaded: false };
+const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservations: [], services: [], vehiculeTypes: [], serviceCategories: [], vehiculeCategories: [], clientsLoaded: false, bookingConfig: null };
 
 // Map nom_service → prix (rempli au boot, utilisé pour pré-remplir le montant)
 const PRIX = {};
@@ -2547,16 +2547,32 @@ function vehiculeLabel(r) {
 async function renderReservationsPage() {
   // Pour la recherche client dans la modale, on lazy-load les clients aussi
   if (!cache.clientsLoaded) await DB.loadClients();
+  await loadBookingConfig();
   renderReservationsList();
   refreshBookingToggle();
 }
 
+// Réglages réservation (horaires + capacité), avec valeurs par défaut
+async function loadBookingConfig() {
+  const { data } = await sb.from('booking_config').select('*').eq('id', true).maybeSingle();
+  if (data) cache.bookingConfig = data;
+  return cache.bookingConfig;
+}
+function bookingCfg() {
+  const c = cache.bookingConfig || {};
+  return {
+    open:  Number.isFinite(c.open_hour)    ? c.open_hour    : 10,
+    close: Number.isFinite(c.close_hour)   ? c.close_hour   : 19,
+    step:  Number.isFinite(c.slot_minutes) ? c.slot_minutes : 60,
+    cap:   Number.isFinite(c.capacity)     ? c.capacity     : 1,
+  };
+}
+
 // ----- Ouverture / fermeture des réservations en ligne (admin/super_admin) -----
-async function refreshBookingToggle() {
+function refreshBookingToggle() {
   const btn = document.getElementById('btnBookingToggle');
   if (!btn || !isAdmin()) return;
-  const { data } = await sb.from('booking_config').select('is_open').eq('id', true).maybeSingle();
-  const open = data ? data.is_open : true;
+  const open = cache.bookingConfig ? cache.bookingConfig.is_open : true;
   btn.dataset.open = open ? '1' : '0';
   btn.textContent = open ? '🟢 Réservations en ligne : ouvertes' : '🔴 Réservations en ligne : FERMÉES';
   btn.classList.toggle('btn-danger', !open);
@@ -2564,11 +2580,8 @@ async function refreshBookingToggle() {
 }
 
 document.getElementById('btnBookingToggle').addEventListener('click', async () => {
-  // On relit l'état réel en base juste avant de basculer (évite tout état périmé)
-  const { data: cur, error: eRead } = await sb.from('booking_config')
-    .select('is_open').eq('id', true).maybeSingle();
-  if (eRead) { toast('Erreur : ' + eRead.message, '#e53935'); return; }
-  const open = cur ? cur.is_open : true;
+  await loadBookingConfig();
+  const open = cache.bookingConfig ? cache.bookingConfig.is_open : true;
   const next = !open;
   if (!confirm(next
     ? 'Rouvrir les réservations en ligne pour les clients ?'
@@ -2577,15 +2590,54 @@ document.getElementById('btnBookingToggle').addEventListener('click', async () =
   const { data, error } = await sb.from('booking_config')
     .update({ is_open: next, updated_at: new Date().toISOString() })
     .eq('id', true)
-    .select('is_open');
+    .select();
   if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
   if (!data || data.length === 0) {
     toast('Modification refusée — droits administrateur requis.', '#e53935');
     return;
   }
-  await refreshBookingToggle();
+  cache.bookingConfig = data[0];
+  refreshBookingToggle();
   toast(next ? 'Réservations en ligne rouvertes' : 'Réservations en ligne fermées',
         next ? '#0d9e6e' : '#f59e0b');
+});
+
+// ----- Modale de réglages (horaires + capacité) -----
+const bookingSettingsModal = document.getElementById('bookingSettingsModal');
+function closeBookingSettings() { bookingSettingsModal.classList.remove('show'); }
+document.getElementById('btnBookingSettings').addEventListener('click', async () => {
+  await loadBookingConfig();
+  const c = cache.bookingConfig || {};
+  document.getElementById('bs-open').value     = Number.isFinite(c.open_hour)    ? c.open_hour    : 10;
+  document.getElementById('bs-close').value    = Number.isFinite(c.close_hour)   ? c.close_hour   : 19;
+  document.getElementById('bs-step').value     = String(Number.isFinite(c.slot_minutes) ? c.slot_minutes : 60);
+  document.getElementById('bs-capacity').value = Number.isFinite(c.capacity)     ? c.capacity     : 1;
+  bookingSettingsModal.classList.add('show');
+});
+document.getElementById('bsClose').addEventListener('click', closeBookingSettings);
+document.getElementById('bsCancel').addEventListener('click', closeBookingSettings);
+bookingSettingsModal.addEventListener('click', (e) => { if (e.target === bookingSettingsModal) closeBookingSettings(); });
+
+document.getElementById('formBookingSettings').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const open  = parseInt(document.getElementById('bs-open').value, 10);
+  const close = parseInt(document.getElementById('bs-close').value, 10);
+  const step  = parseInt(document.getElementById('bs-step').value, 10);
+  const cap   = parseInt(document.getElementById('bs-capacity').value, 10);
+  if (!(open >= 0 && open <= 23) || !(close >= 1 && close <= 24) || close <= open) {
+    toast("Horaires invalides (l'ouverture doit précéder la fermeture)", '#e53935'); return;
+  }
+  if ((close - open) * 60 < step) { toast('La plage horaire est plus courte qu’un créneau', '#e53935'); return; }
+  if (!(cap >= 1)) { toast('Capacité invalide', '#e53935'); return; }
+  const { data, error } = await sb.from('booking_config')
+    .update({ open_hour: open, close_hour: close, slot_minutes: step, capacity: cap, updated_at: new Date().toISOString() })
+    .eq('id', true)
+    .select();
+  if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
+  if (!data || data.length === 0) { toast('Modification refusée — droits administrateur requis.', '#e53935'); return; }
+  cache.bookingConfig = data[0];
+  closeBookingSettings();
+  toast('Réglages enregistrés', '#0d9e6e');
 });
 
 function renderReservationsList() {
@@ -2839,22 +2891,26 @@ function resetResaSlots() {
 }
 
 function renderResaSlots(dateStr) {
-  const OPEN = 10, CLOSE = 18;
+  const cfg = bookingCfg();
+  const startMin = cfg.open * 60, endMin = cfg.close * 60;
+  const step = Math.max(cfg.step, 5), cap = Math.max(cfg.cap, 1);
   const todayStr = todayYmd();
-  const curH = new Date().getHours();
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
   const slots = [];
-  for (let h = OPEN; h <= CLOSE; h++) {
-    if (dateStr === todayStr && h <= curH) continue;
-    const taken = cache.reservations.some(r =>
+  for (let m = startMin; m <= endMin - step; m += step) {
+    if (dateStr === todayStr && m <= nowMin) continue;
+    const t = `${String(Math.floor(m / 60)).padStart(2,'0')}:${String(m % 60).padStart(2,'0')}`;
+    const count = cache.reservations.filter(r =>
       r.id !== editingResaId &&
       (r.statut === 'prevu' || r.statut === 'arrive') &&
       r.date_prevue === dateStr &&
-      parseInt((r.heure_prevue || '').slice(0,2), 10) === h
-    );
-    if (taken) continue;
-    slots.push(String(h).padStart(2,'0') + ':00');
+      (r.heure_prevue || '').slice(0,5) === t
+    ).length;
+    if (count >= cap) continue;
+    slots.push(t);
   }
-  // En édition : garder le créneau actuel même s'il est passé / occupé par lui-même
+  // En édition : garder le créneau actuel même s'il est passé / complet par lui-même
   const cur = document.getElementById('r-heure').value;
   if (cur && !slots.includes(cur)) { slots.push(cur); slots.sort(); }
 
@@ -2991,15 +3047,16 @@ document.getElementById('formResa').addEventListener('submit', async (ev) => {
     return;
   }
 
-  // 2) Refuser un conflit de créneau (même date + même heure, statut prevu)
-  const conflict = cache.reservations.find(r =>
+  // 2) Refuser si le créneau est complet (capacité atteinte)
+  const cap = Math.max(bookingCfg().cap, 1);
+  const taken = cache.reservations.filter(r =>
     r.id !== editingResaId &&
-    r.statut === 'prevu' &&
+    (r.statut === 'prevu' || r.statut === 'arrive') &&
     r.date_prevue === dateVal &&
     (r.heure_prevue || '').slice(0,5) === heureVal
-  );
-  if (conflict) {
-    toast(`Créneau déjà réservé à ${heureVal} pour ${clientLabel(conflict)}`, '#e53935');
+  ).length;
+  if (taken >= cap) {
+    toast(`Créneau complet à ${heureVal} (${cap} max)`, '#e53935');
     return;
   }
 

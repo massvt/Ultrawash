@@ -357,6 +357,7 @@
       <header class="page-header">
         <h1>Réservations</h1>
         <div class="header-actions">
+          <button class="btn-outline admin-only" id="btnBookingSettings" title="Régler les horaires et la capacité des réservations en ligne">⚙️ Réglages</button>
           <button class="btn-outline admin-only" id="btnBookingToggle" title="Ouvrir / fermer les réservations en ligne (forte affluence)">Réservations en ligne…</button>
           <button class="btn-outline" id="btnBookingLink" title="Copier le lien de réservation à envoyer aux clients">🔗 Lien client</button>
           <button class="btn-primary" id="btnNewResa">+ Nouvelle réservation</button>
@@ -878,6 +879,47 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-outline" data-modal-cancel>Annuler</button>
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL RÉGLAGES RÉSERVATION (admin) -->
+  <div id="bookingSettingsModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Réglages des réservations</h3>
+        <button type="button" class="modal-close" id="bsClose" aria-label="Fermer">✕</button>
+      </div>
+      <form id="formBookingSettings" class="modal-form active">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Heure d'ouverture</label>
+            <input type="number" id="bs-open" min="0" max="23" step="1" />
+          </div>
+          <div class="form-group">
+            <label>Heure de fermeture</label>
+            <input type="number" id="bs-close" min="1" max="24" step="1" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Durée d'un créneau</label>
+            <select id="bs-step">
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">1 heure</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Voitures par créneau</label>
+            <input type="number" id="bs-capacity" min="1" max="20" step="1" />
+          </div>
+        </div>
+        <p class="resa-client-note">Ces réglages s'appliquent à la réservation en ligne (lien client) et au calendrier interne.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" id="bsCancel">Annuler</button>
           <button type="submit" class="btn-primary">Enregistrer</button>
         </div>
       </form>
