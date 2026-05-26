@@ -160,7 +160,7 @@ $('bookForm').addEventListener('submit', async (ev) => {
     p_nom: nom,
     p_telephone: tel,
     p_plaque: null,
-    p_vehicule_type: $('f-vehtype').value || null,
+    p_vehicule_type: null,
     p_date: state.date,
     p_heure: state.heure,
     p_type_lavage: $('f-service').value || null,
@@ -211,24 +211,17 @@ $('againBtn').addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// ---------- Boot : charger services + types véhicule ----------
+// ---------- Boot : charger les services ----------
 async function boot() {
   renderDow();
   renderCalendar();
 
-  const [{ data: svc }, { data: vt }] = await Promise.all([
-    sb.rpc('public_services'),
-    sb.rpc('public_vehicule_types'),
-  ]);
+  const { data: svc } = await sb.rpc('public_services');
 
   state.services = svc || [];
   const svcSel = $('f-service');
   svcSel.innerHTML = '<option value="">— Sans préférence —</option>' +
     state.services.map(s => `<option value="${escapeHtml(s.nom)}">${escapeHtml(s.nom)} — ${fmtPrix(s.prix)}</option>`).join('');
-
-  const vtSel = $('f-vehtype');
-  vtSel.innerHTML = '<option value="">— Non précisé —</option>' +
-    (vt || []).map(t => `<option value="${escapeHtml(t.nom)}">${escapeHtml(t.nom)}</option>`).join('');
 }
 
 boot();
