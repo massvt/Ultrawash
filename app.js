@@ -454,7 +454,11 @@ function renderActivePage() {
   const active = document.querySelector('.page.active');
   if (!active) return;
   switch (active.id) {
-    case 'page-dashboard':     renderDashboard(); refreshDashResaToday(); break;
+    case 'page-dashboard':
+      // On ne redessine les graphiques que si les chiffres ont changé
+      if (dashSignature() !== lastDashSig) renderDashboard();
+      refreshDashResaToday(); // widget léger (sans graphe), toujours à jour
+      break;
     case 'page-entrees':       renderEntreesList(); break;
     case 'page-sorties':       renderSortiesList(); break;
     case 'page-clients':       renderClientsPage(); break;
@@ -543,6 +547,16 @@ function inToday(dateStr) {
 // ===== DASHBOARD =====
 let chartCA = null, chartTypes = null, chartCategories = null, chartVehicules = null, chartHeures = null, chartServiceCat = null;
 
+// Signature des données du dashboard : on ne redessine les graphiques
+// (lourds) que si elle a changé, pour éviter tout clignotement à chaque
+// rafraîchissement automatique.
+let lastDashSig = '';
+function dashSignature() {
+  const e = cache.entrees.map(x => `${x.id}:${x.date}:${x.montant}:${x.type}:${x.vehicule}`).join(',');
+  const s = cache.sorties.map(x => `${x.id}:${x.date}:${x.montant}:${x.categorie}`).join(',');
+  return e + '||' + s;
+}
+
 // Catégorie d'un service (lookup dans cache.services, sinon 'Autre')
 const serviceCategory = (type) => {
   const s = cache.services.find(x => x.nom === type);
@@ -562,6 +576,7 @@ function getDashPeriodType() {
 }
 
 function renderDashboard() {
+  lastDashSig = dashSignature();
   const entrees = DB.getEntrees().filter(e => inDashRange(e.date));
   const sorties = DB.getSorties().filter(s => inDashRange(s.date));
   const period = getDashPeriodType();
