@@ -2548,7 +2548,36 @@ async function renderReservationsPage() {
   // Pour la recherche client dans la modale, on lazy-load les clients aussi
   if (!cache.clientsLoaded) await DB.loadClients();
   renderReservationsList();
+  refreshBookingToggle();
 }
+
+// ----- Ouverture / fermeture des réservations en ligne (admin/super_admin) -----
+async function refreshBookingToggle() {
+  const btn = document.getElementById('btnBookingToggle');
+  if (!btn || !isAdmin()) return;
+  const { data } = await sb.from('booking_config').select('is_open').eq('id', true).maybeSingle();
+  const open = data ? data.is_open : true;
+  btn.dataset.open = open ? '1' : '0';
+  btn.textContent = open ? '🟢 Réservations en ligne : ouvertes' : '🔴 Réservations en ligne : FERMÉES';
+  btn.classList.toggle('btn-danger', !open);
+  btn.classList.toggle('btn-outline', open);
+}
+
+document.getElementById('btnBookingToggle').addEventListener('click', async () => {
+  const btn = document.getElementById('btnBookingToggle');
+  const open = btn.dataset.open === '1';
+  const next = !open;
+  if (!confirm(next
+    ? 'Rouvrir les réservations en ligne pour les clients ?'
+    : 'Fermer les réservations en ligne ? (les clients ne pourront plus réserver via le lien public)')) return;
+  const { error } = await sb.from('booking_config')
+    .update({ is_open: next, updated_at: new Date().toISOString() })
+    .eq('id', true);
+  if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
+  await refreshBookingToggle();
+  toast(next ? 'Réservations en ligne rouvertes' : 'Réservations en ligne fermées',
+        next ? '#0d9e6e' : '#f59e0b');
+});
 
 function renderReservationsList() {
   const period  = document.getElementById('r-period').value;

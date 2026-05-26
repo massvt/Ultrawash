@@ -87,6 +87,10 @@
       font-size:2.4rem;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
     .done h2{color:var(--ink);margin:0 0 8px;display:block;text-align:center}
     .done p{color:var(--muted);margin:4px 0}
+    .closed-banner{text-align:center;padding:28px 18px}
+    .closed-banner .closed-ico{font-size:2.6rem;margin-bottom:8px}
+    .closed-banner h2{display:block;justify-content:center;color:var(--ink);margin:0 0 10px}
+    .closed-banner p{color:var(--muted);margin:0;font-size:1rem}
     footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:28px}
   </style>
 </head>
@@ -96,6 +100,13 @@
       <img src="logo_ultrawash.webp" alt="UltraWash" />
       <h1>Réserver un lavage</h1>
       <p>Choisissez votre créneau en quelques secondes</p>
+    </div>
+
+    <!-- Bannière : réservations fermées (forte affluence) -->
+    <div class="card closed-banner hidden" id="closedBanner">
+      <div class="closed-ico">⏸️</div>
+      <h2>Réservations en ligne fermées</h2>
+      <p id="closedMessage"></p>
     </div>
 
     <!-- Parcours de réservation -->

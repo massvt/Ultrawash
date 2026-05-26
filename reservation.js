@@ -211,10 +211,20 @@ $('againBtn').addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// ---------- Boot : charger les types de service ----------
+// ---------- Boot : vérifier l'ouverture puis charger les types ----------
 async function boot() {
   renderDow();
   renderCalendar();
+
+  // Réservations fermées par l'équipe (forte affluence) ?
+  const { data: status } = await sb.rpc('public_booking_status');
+  const st = status && status[0];
+  if (st && st.is_open === false) {
+    $('flow').classList.add('hidden');
+    $('closedMessage').textContent = st.closed_message || 'Les réservations en ligne sont momentanément fermées.';
+    $('closedBanner').classList.remove('hidden');
+    return;
+  }
 
   const { data: vt } = await sb.rpc('public_vehicule_types');
 
