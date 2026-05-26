@@ -513,6 +513,40 @@ function toast(msg, color = '#0d9e6e') {
 const fmt = (n) => Number(n).toLocaleString('fr-FR') + ' FCFA';
 const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR');
 
+// ===== PAGINATION (10 enregistrements par page) =====
+const PER_PAGE = 10;
+const pagers = {}; // page courante par liste (ex. pagers.clients)
+
+// Renvoie la tranche de la page courante (clampe la page si hors limites)
+function paginate(items, key) {
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  let page = Math.min(Math.max(pagers[key] || 1, 1), totalPages);
+  pagers[key] = page;
+  const start = (page - 1) * PER_PAGE;
+  return { slice: items.slice(start, start + PER_PAGE), page, totalPages, total };
+}
+
+// Affiche les contrôles « ‹ Précédent · X–Y sur N · Suivant › »
+function renderPager(containerId, key, total, page, totalPages, onChange) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (total <= PER_PAGE) { el.innerHTML = ''; return; }
+  const from = (page - 1) * PER_PAGE + 1;
+  const to = Math.min(page * PER_PAGE, total);
+  el.innerHTML =
+    `<button type="button" class="pager-btn" data-act="prev" ${page <= 1 ? 'disabled' : ''}>‹ Précédent</button>` +
+    `<span class="pager-info">${from}–${to} sur ${total}</span>` +
+    `<button type="button" class="pager-btn" data-act="next" ${page >= totalPages ? 'disabled' : ''}>Suivant ›</button>`;
+  el.querySelector('[data-act="prev"]').addEventListener('click', () => { pagers[key] = Math.max(1, page - 1); onChange(); });
+  el.querySelector('[data-act="next"]').addEventListener('click', () => { pagers[key] = Math.min(totalPages, page + 1); onChange(); });
+}
+
+// Wrapper pour réinitialiser à la page 1 (changement de filtre) puis rendre
+function withPageReset(key, render) {
+  return () => { pagers[key] = 1; render(); };
+}
+
 // ===== PERIOD FILTER =====
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -959,6 +993,7 @@ guardedSubmit(document.getElementById('formEntree'), async (ev) => {
   document.getElementById('e-client-id').value = '';
   document.getElementById('e-vehicule-id').value = '';
   document.getElementById('e-client-hint').innerHTML = '';
+  pagers.entrees = 1;
   renderEntreesList();
   toast('Lavage enregistré !');
 });
@@ -1015,10 +1050,10 @@ document.getElementById('e-telephone').addEventListener('input', (ev) => {
 });
 
 function renderEntreesList() {
-  const list = DB.getEntrees().slice(0, 20);
+  const { slice, page, totalPages, total } = paginate(DB.getEntrees(), 'entrees');
   const tbody = document.getElementById('entreesList');
   const canDelete = isAdmin();
-  tbody.innerHTML = list.map(e => `
+  tbody.innerHTML = slice.map(e => `
     <tr>
       <td>${fmtDate(e.date)} ${e.heure || ''}</td>
       <td>${e.vehicule}</td>
@@ -1028,6 +1063,7 @@ function renderEntreesList() {
       <td>${canDelete ? `<button class="btn-edit" onclick="openEditEntree('${e.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delEntree('${e.id}')" title="Supprimer">✕</button>` : ''}</td>
     </tr>
   `).join('') || '<tr><td colspan="6" class="empty-state">Aucun lavage enregistré</td></tr>';
+  renderPager('entreesPager', 'entrees', total, page, totalPages, renderEntreesList);
 }
 
 async function delEntree(id) {
@@ -1051,14 +1087,15 @@ guardedSubmit(document.getElementById('formSortie'), async (ev) => {
   if (!saved) return;
   ev.target.reset();
   setDefaultDateTime();
+  pagers.sorties = 1;
   renderSortiesList();
   toast('Dépense enregistrée !', '#f59e0b');
 });
 
 function renderSortiesList() {
-  const list = DB.getSorties().slice(0, 20);
+  const { slice, page, totalPages, total } = paginate(DB.getSorties(), 'sorties');
   const tbody = document.getElementById('sortiesList');
-  tbody.innerHTML = list.map(s => `
+  tbody.innerHTML = slice.map(s => `
     <tr>
       <td>${fmtDate(s.date)}</td>
       <td>${s.categorie}</td>
@@ -1067,6 +1104,7 @@ function renderSortiesList() {
       <td><button class="btn-edit" onclick="openEditSortie('${s.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delSortie('${s.id}')" title="Supprimer">✕</button></td>
     </tr>
   `).join('') || '<tr><td colspan="5" class="empty-state">Aucune dépense enregistrée</td></tr>';
+  renderPager('sortiesPager', 'sorties', total, page, totalPages, renderSortiesList);
 }
 
 async function delSortie(id) {
@@ -1226,12 +1264,13 @@ function renderHistorique() {
 
   const tbody = document.getElementById('historiqueTable');
   const empty = document.getElementById('historiqueEmpty');
-  if (filtered.length === 0) {
+  const { slice, page, totalPages, total } = paginate(filtered, 'histo');
+  if (total === 0) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
   } else {
     empty.style.display = 'none';
-    tbody.innerHTML = filtered.map(op => `
+    tbody.innerHTML = slice.map(op => `
       <tr>
         <td>${fmtDate(op.date)}</td>
         <td><span class="badge badge-${op.kind}">${op.kind === 'entree' ? 'Lavage' : 'Dépense'}</span></td>
@@ -1240,17 +1279,19 @@ function renderHistorique() {
       </tr>
     `).join('');
   }
+  renderPager('historiquePager', 'histo', total, page, totalPages, renderHistorique);
 }
 
 ['f-kind','f-from','f-to','f-vehicule','f-telephone','f-categorie'].forEach(id => {
-  document.getElementById(id).addEventListener('input', renderHistorique);
-  document.getElementById(id).addEventListener('change', renderHistorique);
+  document.getElementById(id).addEventListener('input', withPageReset('histo', renderHistorique));
+  document.getElementById(id).addEventListener('change', withPageReset('histo', renderHistorique));
 });
 
 document.getElementById('f-reset').addEventListener('click', () => {
   ['f-kind','f-from','f-to','f-vehicule','f-telephone','f-categorie'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  pagers.histo = 1;
   renderHistorique();
 });
 
@@ -2294,10 +2335,15 @@ function renderClientsList() {
   const empty = document.getElementById('clientsEmpty');
   const list = getFilteredClients();
 
-  if (list.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  if (list.length === 0) {
+    tbody.innerHTML = ''; empty.style.display = 'block';
+    renderPager('clientsPager', 'clients', 0, 1, 1, renderClientsList);
+    return;
+  }
   empty.style.display = 'none';
 
-  tbody.innerHTML = list.map(c => {
+  const { slice, page, totalPages, total } = paginate(list, 'clients');
+  tbody.innerHTML = slice.map(c => {
     const vehs = cache.vehicules.filter(v => v.client_id === c.id);
     const st = clientStats(c.id);
     const plaques = vehs.map(v => v.plaque).join(', ') || '—';
@@ -2323,17 +2369,20 @@ function renderClientsList() {
   tbody.querySelectorAll('tr.row-click').forEach(tr => {
     tr.addEventListener('click', () => openFiche(tr.dataset.cid));
   });
+
+  renderPager('clientsPager', 'clients', total, page, totalPages, renderClientsList);
 }
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-document.getElementById('c-search').addEventListener('input', renderClientsList);
-document.getElementById('c-filter-type').addEventListener('change', renderClientsList);
-document.getElementById('c-from').addEventListener('change', renderClientsList);
-document.getElementById('c-to').addEventListener('change', renderClientsList);
+document.getElementById('c-search').addEventListener('input', withPageReset('clients', renderClientsList));
+document.getElementById('c-filter-type').addEventListener('change', withPageReset('clients', renderClientsList));
+document.getElementById('c-from').addEventListener('change', withPageReset('clients', renderClientsList));
+document.getElementById('c-to').addEventListener('change', withPageReset('clients', renderClientsList));
 document.getElementById('c-reset').addEventListener('click', () => {
+  pagers.clients = 1;
   document.getElementById('c-search').value = '';
   document.getElementById('c-filter-type').value = '';
   document.getElementById('c-from').value = '';
@@ -2899,10 +2948,15 @@ function renderReservationsList() {
     });
   }
 
-  if (list.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  if (list.length === 0) {
+    tbody.innerHTML = ''; empty.style.display = 'block';
+    renderPager('resaPager', 'resa', 0, 1, 1, renderReservationsList);
+    return;
+  }
   empty.style.display = 'none';
 
-  tbody.innerHTML = list.map(r => {
+  const { slice, page, totalPages, total } = paginate(list, 'resa');
+  tbody.innerHTML = slice.map(r => {
     const canDelete = isAdmin();
     const heure = (r.heure_prevue || '').slice(0,5);
     const online = r.source === 'public'
@@ -2929,14 +2983,17 @@ function renderReservationsList() {
   tbody.querySelectorAll('button[data-act]').forEach(b => {
     b.addEventListener('click', () => onResaAction(b.dataset.act, b.dataset.id));
   });
+
+  renderPager('resaPager', 'resa', total, page, totalPages, renderReservationsList);
 }
 
-document.getElementById('r-period').addEventListener('change', renderReservationsList);
-document.getElementById('r-statut').addEventListener('change', renderReservationsList);
-document.getElementById('r-search').addEventListener('input', renderReservationsList);
-document.getElementById('r-from').addEventListener('change', renderReservationsList);
-document.getElementById('r-to').addEventListener('change', renderReservationsList);
+document.getElementById('r-period').addEventListener('change', withPageReset('resa', renderReservationsList));
+document.getElementById('r-statut').addEventListener('change', withPageReset('resa', renderReservationsList));
+document.getElementById('r-search').addEventListener('input', withPageReset('resa', renderReservationsList));
+document.getElementById('r-from').addEventListener('change', withPageReset('resa', renderReservationsList));
+document.getElementById('r-to').addEventListener('change', withPageReset('resa', renderReservationsList));
 document.getElementById('r-reset').addEventListener('click', () => {
+  pagers.resa = 1;
   document.getElementById('r-period').value = 'week';
   document.getElementById('r-statut').value = '';
   document.getElementById('r-search').value = '';

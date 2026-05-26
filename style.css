@@ -1031,6 +1031,15 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .bsc-day.closed { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
 .bsc-day:not(.empty):not(.past):not(.closed):hover { border-color: var(--blue); }
 
+/* Pagination (10/page) */
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px 0 2px; flex-wrap: wrap; }
+.pager:empty { display: none; }
+.pager-btn { padding: 8px 14px; border: 1px solid #e2e8f0; background: #fff; border-radius: 10px;
+  cursor: pointer; font-size: .9rem; font-weight: 600; color: var(--text); transition: .12s; }
+.pager-btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+.pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.pager-info { font-size: .85rem; color: var(--gray-400); font-variant-numeric: tabular-nums; }
+
 .resa-selected { margin-top: 8px; }
 .resa-selected-card {
   background: #ecfdf5;
