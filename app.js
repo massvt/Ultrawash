@@ -825,7 +825,30 @@ function setDefaultDateTime() {
 }
 setDefaultDateTime();
 
-document.getElementById('formEntree').addEventListener('submit', async (ev) => {
+// Anti double-soumission : désactive le bouton + verrou "busy" pendant
+// l'appel réseau, et restaure l'état même en cas d'erreur ou de retour anticipé.
+function guardedSubmit(form, handler) {
+  if (!form) return;
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (form.dataset.busy === '1') return;           // clic multiple ignoré
+    form.dataset.busy = '1';
+    const btn = form.querySelector('button[type="submit"]');
+    const label = btn ? btn.innerHTML : null;
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Enregistrement…'; }
+    try {
+      await handler(ev);
+    } catch (e) {
+      console.error(e);
+      toast('Erreur inattendue — réessayez', '#e53935');
+    } finally {
+      form.dataset.busy = '0';
+      if (btn) { btn.disabled = false; btn.innerHTML = label; }
+    }
+  });
+}
+
+guardedSubmit(document.getElementById('formEntree'), async (ev) => {
   ev.preventDefault();
 
   // Empêcher l'enregistrement à une date antérieure (une heure passée le
@@ -947,7 +970,7 @@ async function delEntree(id) {
 }
 
 // ===== SORTIES =====
-document.getElementById('formSortie').addEventListener('submit', async (ev) => {
+guardedSubmit(document.getElementById('formSortie'), async (ev) => {
   ev.preventDefault();
   const row = {
     date: document.getElementById('s-date').value,
@@ -1032,7 +1055,7 @@ function openEditSortie(id) {
   editModal.classList.add('show');
 }
 
-formEditEntree.addEventListener('submit', async (ev) => {
+guardedSubmit(formEditEntree, async (ev) => {
   ev.preventDefault();
   const id = document.getElementById('ed-id').value;
   const row = {
@@ -1053,7 +1076,7 @@ formEditEntree.addEventListener('submit', async (ev) => {
   toast('Lavage mis à jour !');
 });
 
-formEditSortie.addEventListener('submit', async (ev) => {
+guardedSubmit(formEditSortie, async (ev) => {
   ev.preventDefault();
   const id = document.getElementById('sd-id').value;
   const row = {
@@ -1807,7 +1830,7 @@ function phoneToEmail(tel) {
   return String(tel || '').replace(/\D/g, '') + '@' + PHONE_EMAIL_DOMAIN;
 }
 
-formLogin.addEventListener('submit', async (ev) => {
+guardedSubmit(formLogin, async (ev) => {
   ev.preventDefault();
   loginError.textContent = '';
   loginBtn.disabled = true;
@@ -2110,7 +2133,7 @@ document.getElementById('btnAddUser')?.addEventListener('click', () => openUserM
 document.getElementById('userModalClose')?.addEventListener('click', closeUserModal);
 document.getElementById('userCancel')?.addEventListener('click', closeUserModal);
 
-document.getElementById('formUser')?.addEventListener('submit', async (ev) => {
+guardedSubmit(document.getElementById('formUser'), async (ev) => {
   ev.preventDefault();
   userError.textContent = '';
   const submitBtn = document.getElementById('userSubmit');
@@ -2400,7 +2423,7 @@ document.getElementById('cl-veh-add').addEventListener('click', async () => {
   }
 });
 
-document.getElementById('formClient').addEventListener('submit', async (ev) => {
+guardedSubmit(document.getElementById('formClient'), async (ev) => {
   ev.preventDefault();
   // Si une plaque est saisie mais pas encore ajoutée, on l'ajoute automatiquement
   const pendingPlaque = (document.getElementById('cl-veh-plaque').value || '').trim().toUpperCase();
@@ -2742,7 +2765,7 @@ document.getElementById('bsClose').addEventListener('click', closeBookingSetting
 document.getElementById('bsCancel').addEventListener('click', closeBookingSettings);
 bookingSettingsModal.addEventListener('click', (e) => { if (e.target === bookingSettingsModal) closeBookingSettings(); });
 
-document.getElementById('formBookingSettings').addEventListener('submit', async (ev) => {
+guardedSubmit(document.getElementById('formBookingSettings'), async (ev) => {
   ev.preventDefault();
   const open  = parseInt(document.getElementById('bs-open').value, 10);
   const close = parseInt(document.getElementById('bs-close').value, 10);
@@ -3158,7 +3181,7 @@ function showSelectedClient(client, vehiculeId) {
   });
 }
 
-document.getElementById('formResa').addEventListener('submit', async (ev) => {
+guardedSubmit(document.getElementById('formResa'), async (ev) => {
   ev.preventDefault();
   const dateVal  = document.getElementById('r-date').value;
   const heureVal = document.getElementById('r-heure').value;
