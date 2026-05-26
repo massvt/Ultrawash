@@ -126,19 +126,14 @@ function openForm() {
   $('cardForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function selectedService() {
-  return state.services.find(s => s.nom === $('f-service').value) || null;
-}
-
 function updateRecap() {
-  const svc = selectedService();
-  const price = svc ? ` · <span class="price-tag">${fmtPrix(svc.prix)}</span>` : '';
+  const type = $('f-vehtype').value;
   $('recap').innerHTML =
     `📅 <b>${frDate(state.date)}</b> à <b>${state.heure}</b>` +
-    (svc ? `<br>🧽 ${escapeHtml(svc.nom)}${price}` : '');
+    (type ? `<br>🧽 ${escapeHtml(type)}` : '');
 }
 
-$('f-service').addEventListener('change', updateRecap);
+$('f-vehtype').addEventListener('change', updateRecap);
 
 $('bookForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -160,10 +155,10 @@ $('bookForm').addEventListener('submit', async (ev) => {
     p_nom: nom,
     p_telephone: tel,
     p_plaque: null,
-    p_vehicule_type: null,
+    p_vehicule_type: $('f-vehtype').value || null,
     p_date: state.date,
     p_heure: state.heure,
-    p_type_lavage: $('f-service').value || null,
+    p_type_lavage: null,
     p_notes: $('f-notes').value.trim() || null,
   });
 
@@ -190,12 +185,12 @@ function showError(msg) {
 }
 
 function showConfirmation() {
-  const svc = selectedService();
+  const type = $('f-vehtype').value;
   $('flow').classList.add('hidden');
   $('confirm').classList.remove('hidden');
   $('confirmDetail').innerHTML =
     `Le <b>${frDate(state.date)}</b> à <b>${state.heure}</b>` +
-    (svc ? `<br>${escapeHtml(svc.nom)} — ${fmtPrix(svc.prix)}` : '');
+    (type ? `<br>${escapeHtml(type)}` : '');
   $('confirm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -211,17 +206,16 @@ $('againBtn').addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// ---------- Boot : charger les services ----------
+// ---------- Boot : charger les types de service ----------
 async function boot() {
   renderDow();
   renderCalendar();
 
-  const { data: svc } = await sb.rpc('public_services');
+  const { data: vt } = await sb.rpc('public_vehicule_types');
 
-  state.services = svc || [];
-  const svcSel = $('f-service');
-  svcSel.innerHTML = '<option value="">— Sans préférence —</option>' +
-    state.services.map(s => `<option value="${escapeHtml(s.nom)}">${escapeHtml(s.nom)} — ${fmtPrix(s.prix)}</option>`).join('');
+  const sel = $('f-vehtype');
+  sel.innerHTML = '<option value="">— Choisir —</option>' +
+    (vt || []).map(t => `<option value="${escapeHtml(t.nom)}">${escapeHtml(t.nom)}</option>`).join('');
 }
 
 boot();
