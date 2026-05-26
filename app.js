@@ -2586,11 +2586,14 @@ function renderReservationsList() {
   tbody.innerHTML = list.map(r => {
     const canDelete = isAdmin();
     const heure = (r.heure_prevue || '').slice(0,5);
+    const online = r.source === 'public'
+      ? ' <span class="resa-online" title="Réservation faite en ligne par le client">🌐 en ligne</span>'
+      : '';
     return `
       <tr>
         <td>${fmtDate(r.date_prevue)}</td>
         <td>${heure}</td>
-        <td>${escapeHtml(clientLabel(r))}</td>
+        <td>${escapeHtml(clientLabel(r))}${online}</td>
         <td>${escapeHtml(vehiculeLabel(r))}</td>
         <td>${escapeHtml(r.type_lavage || '—')}</td>
         <td>${r.montant_estime ? fmt(r.montant_estime) : '—'}</td>
@@ -2623,6 +2626,17 @@ document.getElementById('r-reset').addEventListener('click', () => {
   renderReservationsList();
 });
 document.getElementById('btnNewResa').addEventListener('click', () => openResaModal(null));
+
+// Lien public de réservation à envoyer aux clients (reservation.html à la racine du site)
+document.getElementById('btnBookingLink').addEventListener('click', async () => {
+  const url = new URL('reservation.html', window.location.href).href;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Lien de réservation copié — collez-le dans WhatsApp/SMS', '#0d9e6e');
+  } catch {
+    prompt('Copiez le lien de réservation à envoyer au client :', url);
+  }
+});
 
 async function onResaAction(action, id) {
   const r = cache.reservations.find(x => x.id === id);

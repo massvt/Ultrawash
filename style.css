@@ -923,6 +923,8 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .statut-annule { background: #fee2e2; color: #991b1b; }
 
 .resa-actions { white-space: nowrap; display: flex; gap: 4px; flex-wrap: wrap; }
+.resa-online { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  background: #e0f2fe; color: #075985; font-size: .72rem; font-weight: 600; white-space: nowrap; }
 .btn-mini {
   padding: 4px 8px;
   font-size: .8rem;
