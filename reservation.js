@@ -159,7 +159,7 @@ $('bookForm').addEventListener('submit', async (ev) => {
   const { data, error } = await sb.rpc('public_create_booking', {
     p_nom: nom,
     p_telephone: tel,
-    p_plaque: $('f-plaque').value.trim() || null,
+    p_plaque: null,
     p_vehicule_type: $('f-vehtype').value || null,
     p_date: state.date,
     p_heure: state.heure,

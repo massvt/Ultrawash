@@ -221,8 +221,8 @@
               <input type="number" id="e-montant" placeholder="ex: 2000" min="0" required />
             </div>
             <div class="form-group">
-              <label>N° plaque (optionnel)</label>
-              <input type="text" id="e-plaque" placeholder="ex: DK-1234-AB" autocomplete="off" />
+              <label>N° de téléphone (optionnel)</label>
+              <input type="tel" id="e-telephone" placeholder="ex: 77 123 45 67" autocomplete="off" inputmode="tel" />
               <div id="e-client-hint" class="client-hint"></div>
             </div>
           </div>
@@ -240,7 +240,7 @@
         <h3>Entrées récentes</h3>
         <div class="table-wrap"><table class="table">
           <thead>
-            <tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Plaque</th><th>Montant</th><th></th></tr>
+            <tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Téléphone</th><th>Montant</th><th></th></tr>
           </thead>
           <tbody id="entreesList"></tbody>
         </table></div>
@@ -405,7 +405,7 @@
             <th>Date</th>
             <th>Heure</th>
             <th>Client</th>
-            <th>Véhicule / Plaque</th>
+            <th>Véhicule</th>
             <th>Service</th>
             <th>Montant est.</th>
             <th>Statut</th>
@@ -455,8 +455,8 @@
           </select>
         </div>
         <div class="filter-group filter-entree-only">
-          <label>Plaque</label>
-          <input type="text" id="f-plaque" placeholder="ex: DK-1234" />
+          <label>Téléphone</label>
+          <input type="text" id="f-telephone" placeholder="ex: 77 123..." />
         </div>
         <div class="filter-group filter-sortie-only">
           <label>Catégorie</label>
@@ -663,8 +663,8 @@
             <input type="number" id="ed-montant" min="0" required />
           </div>
           <div class="form-group">
-            <label>N° plaque (optionnel)</label>
-            <input type="text" id="ed-plaque" />
+            <label>N° de téléphone (optionnel)</label>
+            <input type="tel" id="ed-telephone" inputmode="tel" />
           </div>
         </div>
         <div class="form-group">
@@ -789,7 +789,7 @@
         <div id="ficheVehicules" class="fiche-vehicules"></div>
         <h4>Historique des lavages</h4>
         <div class="table-wrap"><table class="table">
-          <thead><tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Plaque</th><th>Montant</th></tr></thead>
+          <thead><tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Montant</th></tr></thead>
           <tbody id="ficheHistorique"></tbody>
         </table></div>
         <div id="ficheEmpty" class="empty-state">Aucun lavage enregistré pour ce client.</div>
@@ -845,10 +845,6 @@
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label>Plaque (optionnel)</label>
-              <input type="text" id="r-plaque" />
-            </div>
             <div class="form-group">
               <label>Type de véhicule</label>
               <select id="r-vehicule-type"></select>

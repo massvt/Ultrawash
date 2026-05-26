@@ -845,15 +845,15 @@ document.getElementById('formEntree').addEventListener('submit', async (ev) => {
     }
   }
 
-  const plaque = (document.getElementById('e-plaque').value || '').trim().toUpperCase();
+  const telephone = (document.getElementById('e-telephone').value || '').trim();
   let clientId   = document.getElementById('e-client-id').value || null;
   let vehiculeId = document.getElementById('e-vehicule-id').value || null;
 
-  // Si on a une plaque mais pas de véhicule rattaché, on cherche en base
+  // Si on a un téléphone mais pas de client rattaché, on cherche en base
   // (au cas où le cache local ne soit pas à jour)
-  if (plaque && !vehiculeId) {
-    const { data } = await sb.from('vehicules').select('id, client_id').eq('plaque', plaque).maybeSingle();
-    if (data) { vehiculeId = data.id; clientId = data.client_id; }
+  if (telephone && !clientId) {
+    const { data } = await sb.from('clients').select('id').eq('telephone', telephone).limit(1);
+    if (data && data[0]) clientId = data[0].id;
   }
 
   const row = {
@@ -862,7 +862,7 @@ document.getElementById('formEntree').addEventListener('submit', async (ev) => {
     vehicule: document.getElementById('e-vehicule').value,
     type: document.getElementById('e-type').value,
     montant: Number(document.getElementById('e-montant').value),
-    plaque: plaque || null,
+    telephone: telephone || null,
     notes: document.getElementById('e-notes').value || null,
     client_id: clientId,
     vehicule_id: vehiculeId,
@@ -893,35 +893,37 @@ bindPrixAuto('e-type',  'e-montant');
 bindPrixAuto('ed-type', 'ed-montant');
 bindPrixAuto('r-type',  'r-montant');
 
-// Auto-rattachement par plaque (debounced)
-let plaqueLookupTimer = null;
-document.getElementById('e-plaque').addEventListener('input', (ev) => {
-  clearTimeout(plaqueLookupTimer);
+// Auto-rattachement par téléphone (debounced)
+let telLookupTimer = null;
+document.getElementById('e-telephone').addEventListener('input', (ev) => {
+  clearTimeout(telLookupTimer);
   const hint = document.getElementById('e-client-hint');
   const clientHidden = document.getElementById('e-client-id');
   const vehHidden = document.getElementById('e-vehicule-id');
-  const plaque = ev.target.value.trim().toUpperCase();
+  const telephone = ev.target.value.trim();
   clientHidden.value = '';
   vehHidden.value = '';
   hint.innerHTML = '';
-  if (plaque.length < 3) return;
-  plaqueLookupTimer = setTimeout(async () => {
+  if (telephone.length < 4) return;
+  telLookupTimer = setTimeout(async () => {
     const { data } = await sb
-      .from('vehicules')
-      .select('id, client_id, marque, modele, clients(nom, type, telephone)')
-      .eq('plaque', plaque)
-      .maybeSingle();
-    if (data && data.clients) {
-      clientHidden.value = data.client_id;
-      vehHidden.value = data.id;
-      const c = data.clients;
-      const veh = [data.marque, data.modele].filter(Boolean).join(' ');
-      hint.innerHTML = `<span class="hint-ok">✓ Client connu : <b>${c.nom}</b>${c.telephone ? ' · ' + c.telephone : ''}${veh ? ' · ' + veh : ''}</span>`;
+      .from('clients')
+      .select('id, nom, type, telephone, vehicules(id, plaque)')
+      .eq('telephone', telephone)
+      .limit(1);
+    const c = data && data[0];
+    if (c) {
+      clientHidden.value = c.id;
+      // Si le client n'a qu'un seul véhicule, on le rattache aussi
+      const vehs = c.vehicules || [];
+      if (vehs.length === 1) vehHidden.value = vehs[0].id;
+      const plaqueInfo = vehs.length === 1 && vehs[0].plaque ? ' · ' + vehs[0].plaque : '';
+      hint.innerHTML = `<span class="hint-ok">✓ Client connu : <b>${escapeHtml(c.nom)}</b>${plaqueInfo}</span>`;
     } else {
-      hint.innerHTML = `<span class="hint-new">Plaque inconnue — sera enregistrée sans client. <a href="#" id="hint-create-client">Créer une fiche ?</a></span>`;
+      hint.innerHTML = `<span class="hint-new">Numéro inconnu — sera enregistré sans fiche client. <a href="#" id="hint-create-client">Créer une fiche ?</a></span>`;
       document.getElementById('hint-create-client').addEventListener('click', (e) => {
         e.preventDefault();
-        openClientModal(null, { plaque });
+        openClientModal(null, { telephone });
       });
     }
   }, 350);
@@ -936,7 +938,7 @@ function renderEntreesList() {
       <td>${fmtDate(e.date)} ${e.heure || ''}</td>
       <td>${e.vehicule}</td>
       <td>${e.type}</td>
-      <td>${e.plaque || '—'}</td>
+      <td>${escapeHtml(e.telephone || '—')}</td>
       <td class="montant-entree">+${fmt(e.montant)}</td>
       <td>${canDelete ? `<button class="btn-edit" onclick="openEditEntree('${e.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delEntree('${e.id}')" title="Supprimer">✕</button>` : ''}</td>
     </tr>
@@ -1016,7 +1018,7 @@ function openEditEntree(id) {
   document.getElementById('ed-vehicule').value = e.vehicule;
   document.getElementById('ed-type').value = e.type;
   document.getElementById('ed-montant').value = e.montant;
-  document.getElementById('ed-plaque').value = e.plaque || '';
+  document.getElementById('ed-telephone').value = e.telephone || '';
   document.getElementById('ed-notes').value = e.notes || '';
   formEditSortie.classList.remove('active');
   formEditEntree.classList.add('active');
@@ -1046,7 +1048,7 @@ formEditEntree.addEventListener('submit', async (ev) => {
     vehicule: document.getElementById('ed-vehicule').value,
     type: document.getElementById('ed-type').value,
     montant: Number(document.getElementById('ed-montant').value),
-    plaque: document.getElementById('ed-plaque').value || null,
+    telephone: document.getElementById('ed-telephone').value.trim() || null,
     notes: document.getElementById('ed-notes').value || null,
   };
   const saved = await DB.updateEntree(id, row);
@@ -1083,13 +1085,13 @@ function getFilters() {
     from: document.getElementById('f-from').value,
     to: document.getElementById('f-to').value,
     vehicule: document.getElementById('f-vehicule').value,
-    plaque: document.getElementById('f-plaque').value.trim().toLowerCase(),
+    telephone: document.getElementById('f-telephone').value.trim().toLowerCase(),
     categorie: document.getElementById('f-categorie').value,
   };
 }
 
 function applyFilters(ops, f) {
-  const entreeFilterActive = f.vehicule || f.plaque;
+  const entreeFilterActive = f.vehicule || f.telephone;
   const sortieFilterActive = f.categorie;
   return ops.filter(op => {
     if (f.kind && op.kind !== f.kind) return false;
@@ -1098,7 +1100,7 @@ function applyFilters(ops, f) {
     if (op.kind === 'entree') {
       if (sortieFilterActive) return false;
       if (f.vehicule && op.vehicule !== f.vehicule) return false;
-      if (f.plaque && !(op.plaque || '').toLowerCase().includes(f.plaque)) return false;
+      if (f.telephone && !(op.telephone || '').toLowerCase().includes(f.telephone)) return false;
     } else {
       if (entreeFilterActive) return false;
       if (f.categorie && op.categorie !== f.categorie) return false;
@@ -1148,20 +1150,20 @@ function renderHistorique() {
       <tr>
         <td>${fmtDate(op.date)}</td>
         <td><span class="badge badge-${op.kind}">${op.kind === 'entree' ? 'Lavage' : 'Dépense'}</span></td>
-        <td>${op.kind === 'entree' ? (op.vehicule + ' – ' + op.type + (op.plaque ? ' [' + op.plaque + ']' : '')) : (op.categorie + (op.description ? ' – ' + op.description : ''))}</td>
+        <td>${op.kind === 'entree' ? (op.vehicule + ' – ' + op.type + (op.telephone ? ' · ' + escapeHtml(op.telephone) : '')) : (op.categorie + (op.description ? ' – ' + op.description : ''))}</td>
         <td class="montant-${op.kind}">${op.kind === 'entree' ? '+' : '-'}${fmt(op.montant)}</td>
       </tr>
     `).join('');
   }
 }
 
-['f-kind','f-from','f-to','f-vehicule','f-plaque','f-categorie'].forEach(id => {
+['f-kind','f-from','f-to','f-vehicule','f-telephone','f-categorie'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderHistorique);
   document.getElementById(id).addEventListener('change', renderHistorique);
 });
 
 document.getElementById('f-reset').addEventListener('click', () => {
-  ['f-kind','f-from','f-to','f-vehicule','f-plaque','f-categorie'].forEach(id => {
+  ['f-kind','f-from','f-to','f-vehicule','f-telephone','f-categorie'].forEach(id => {
     document.getElementById(id).value = '';
   });
   renderHistorique();
@@ -1185,7 +1187,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
   const rows = filtered.map(op => {
     const label = op.kind === 'entree' ? 'Lavage' : 'Dépense';
     const detail = op.kind === 'entree'
-      ? `${op.vehicule} - ${op.type}${op.plaque ? ' [' + op.plaque + ']' : ''}`
+      ? `${op.vehicule} - ${op.type}${op.telephone ? ' - ' + op.telephone : ''}`
       : `${op.categorie}${op.description ? ' - ' + op.description : ''}`;
     const sign = op.kind === 'entree' ? '' : '-';
     return `${op.date},${label},"${detail}",${sign}${op.montant}`;
@@ -2310,6 +2312,10 @@ function openClientModal(clientId, prefill = {}) {
     document.getElementById('cl-adresse').value   = c.adresse || '';
     document.getElementById('cl-notes').value     = c.notes || '';
   }
+  // Pré-remplir le téléphone si fourni (depuis la fiche entrée)
+  if (!clientId && prefill.telephone) {
+    document.getElementById('cl-telephone').value = prefill.telephone;
+  }
   // Pré-remplir le champ d'ajout véhicule (sans pousser dans la liste)
   document.getElementById('cl-veh-plaque').value = prefill.plaque ? prefill.plaque.toUpperCase() : '';
   document.getElementById('cl-veh-marque').value = '';
@@ -2471,7 +2477,6 @@ function openFiche(clientId) {
         <td>${fmtDate(e.date)} ${e.heure || ''}</td>
         <td>${escapeHtml(e.vehicule || '')}</td>
         <td>${escapeHtml(e.type || '')}</td>
-        <td>${escapeHtml(e.plaque || '—')}</td>
         <td class="montant-entree">+${fmt(e.montant)}</td>
       </tr>`).join('');
   }
@@ -2538,8 +2543,6 @@ function vehiculeLabel(r) {
       const desc = [v.marque, v.modele].filter(Boolean).join(' ');
       label = (desc ? desc + ' · ' : '') + v.plaque;
     }
-  } else if (r.plaque) {
-    label = (label ? label + ' · ' : '') + r.plaque;
   }
   return label || '—';
 }
@@ -2663,21 +2666,27 @@ async function convertResaToEntree(r) {
   // L'entrée est datée du moment réel d'arrivée, pas du créneau prévu :
   // sinon une résa marquée "arrivé" en retard fausse le CA du jour.
   const now = new Date();
+  // Téléphone : depuis le snapshot résa, sinon depuis la fiche client liée
+  let telephone = r.client_telephone || null;
+  if (!telephone && r.client_id) {
+    const c = cache.clients.find(x => x.id === r.client_id);
+    if (c) telephone = c.telephone || null;
+  }
   const row = {
     date: todayYmd(),
     heure: now.toTimeString().slice(0,5),
     vehicule: r.vehicule_type || 'Voiture',
     type: r.type_lavage || 'Lavage simple',
     montant: Number(r.montant_estime || 0),
-    plaque: r.plaque || null,
+    telephone: telephone,
     notes: r.notes || null,
     client_id: r.client_id || null,
     vehicule_id: r.vehicule_id || null,
   };
-  // Si plaque mais pas de vehicule_id → tenter résolution
-  if (row.plaque && !row.vehicule_id) {
-    const { data } = await sb.from('vehicules').select('id, client_id').eq('plaque', row.plaque).maybeSingle();
-    if (data) { row.vehicule_id = data.id; if (!row.client_id) row.client_id = data.client_id; }
+  // Si on a un téléphone mais pas de client rattaché → tenter résolution
+  if (telephone && !row.client_id) {
+    const { data } = await sb.from('clients').select('id').eq('telephone', telephone).limit(1);
+    if (data && data[0]) row.client_id = data[0].id;
   }
   // Demander confirmation du montant si pas estimé
   if (!row.montant) {
@@ -2725,7 +2734,6 @@ function openResaModal(id) {
       setResaMode('passage');
       document.getElementById('r-client-nom').value       = r.client_nom || '';
       document.getElementById('r-client-telephone').value = r.client_telephone || '';
-      document.getElementById('r-plaque').value           = r.plaque || '';
       document.getElementById('r-vehicule-type').value    = r.vehicule_type || 'Voiture';
     }
   } else {
@@ -2870,39 +2878,36 @@ document.getElementById('formResa').addEventListener('submit', async (ev) => {
     const vid = document.getElementById('r-vehicule-id').value || null;
     row.client_id   = cid;
     row.vehicule_id = vid;
-    // Snapshot : on fige nom/tel/plaque/type dans la ligne résa pour
-    // que l'historique reste lisible si le client/véhicule est supprimé.
+    // Snapshot : on fige nom/tél dans la ligne résa pour que l'historique
+    // reste lisible si le client est supprimé. La plaque vit sur la fiche
+    // client (véhicules) ; on l'affiche via vehicule_id, pas en snapshot.
     const c = cache.clients.find(x => x.id === cid) || null;
-    const v = vid ? cache.vehicules.find(x => x.id === vid) || null : null;
     row.client_nom        = c ? c.nom : null;
     row.client_telephone  = c ? (c.telephone || null) : null;
-    row.plaque            = v ? v.plaque : null;
+    row.plaque            = null;
     row.vehicule_type     = null;
   } else {
     const nom = document.getElementById('r-client-nom').value.trim();
     if (!nom) { toast('Nom du client requis', '#e53935'); return; }
-    const plaque = (document.getElementById('r-plaque').value || '').trim().toUpperCase() || null;
+    const telephone = document.getElementById('r-client-telephone').value.trim() || null;
 
-    // 3) Si la plaque saisie est déjà dans la base clients, on bascule en mode "existant"
-    if (plaque) {
-      // Vérif via cache local d'abord
-      let veh = cache.vehicules.find(v => v.plaque === plaque);
+    // 3) Si le téléphone correspond déjà à un client, on propose la bascule en mode "existant"
+    if (telephone) {
+      let cli = cache.clients.find(c => c.telephone === telephone);
       // Filet via Supabase (au cas où le cache n'est pas chargé)
-      if (!veh) {
-        const { data } = await sb.from('vehicules').select('id, client_id, plaque').eq('plaque', plaque).maybeSingle();
-        if (data) veh = data;
+      if (!cli) {
+        const { data } = await sb.from('clients').select('id, nom').eq('telephone', telephone).limit(1);
+        if (data && data[0]) cli = data[0];
       }
-      if (veh) {
-        const owner = cache.clients.find(c => c.id === veh.client_id);
-        const ownerName = owner ? owner.nom : 'un client enregistré';
-        if (confirm(`La plaque ${plaque} est déjà rattachée à : ${ownerName}.\nBasculer sur ce client enregistré ?`)) {
+      if (cli) {
+        if (confirm(`Le numéro ${telephone} correspond déjà à : ${cli.nom}.\nBasculer sur ce client enregistré ?`)) {
           // Bascule automatique
           if (!cache.clientsLoaded) await DB.loadClients();
           setResaMode('existing');
-          document.getElementById('r-client-id').value   = veh.client_id;
-          document.getElementById('r-vehicule-id').value = veh.id;
-          const c = cache.clients.find(x => x.id === veh.client_id);
-          if (c) showSelectedClient(c, veh.id);
+          document.getElementById('r-client-id').value   = cli.id;
+          document.getElementById('r-vehicule-id').value = '';
+          const c = cache.clients.find(x => x.id === cli.id);
+          if (c) showSelectedClient(c, null);
           toast('Client trouvé — vérifie puis clique Enregistrer', '#1e40af');
         }
         return; // dans tous les cas, on stoppe ici (l'utilisateur valide manuellement)
@@ -2912,8 +2917,8 @@ document.getElementById('formResa').addEventListener('submit', async (ev) => {
     row.client_id   = null;
     row.vehicule_id = null;
     row.client_nom        = nom;
-    row.client_telephone  = document.getElementById('r-client-telephone').value.trim() || null;
-    row.plaque            = plaque;
+    row.client_telephone  = telephone;
+    row.plaque            = null;
     row.vehicule_type     = document.getElementById('r-vehicule-type').value;
   }
 
