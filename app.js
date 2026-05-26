@@ -2564,16 +2564,25 @@ async function refreshBookingToggle() {
 }
 
 document.getElementById('btnBookingToggle').addEventListener('click', async () => {
-  const btn = document.getElementById('btnBookingToggle');
-  const open = btn.dataset.open === '1';
+  // On relit l'état réel en base juste avant de basculer (évite tout état périmé)
+  const { data: cur, error: eRead } = await sb.from('booking_config')
+    .select('is_open').eq('id', true).maybeSingle();
+  if (eRead) { toast('Erreur : ' + eRead.message, '#e53935'); return; }
+  const open = cur ? cur.is_open : true;
   const next = !open;
   if (!confirm(next
     ? 'Rouvrir les réservations en ligne pour les clients ?'
     : 'Fermer les réservations en ligne ? (les clients ne pourront plus réserver via le lien public)')) return;
-  const { error } = await sb.from('booking_config')
+  // On vérifie que la ligne a bien été modifiée (sinon = droits insuffisants côté RLS)
+  const { data, error } = await sb.from('booking_config')
     .update({ is_open: next, updated_at: new Date().toISOString() })
-    .eq('id', true);
+    .eq('id', true)
+    .select('is_open');
   if (error) { toast('Erreur : ' + error.message, '#e53935'); return; }
+  if (!data || data.length === 0) {
+    toast('Modification refusée — droits administrateur requis.', '#e53935');
+    return;
+  }
   await refreshBookingToggle();
   toast(next ? 'Réservations en ligne rouvertes' : 'Réservations en ligne fermées',
         next ? '#0d9e6e' : '#f59e0b');
