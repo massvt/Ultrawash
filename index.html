@@ -811,56 +811,52 @@
       <form id="formResa" class="modal-form active">
         <input type="hidden" id="r-id" />
 
-        <!-- Mode client -->
-        <div class="form-group">
-          <label>Client</label>
-          <div class="resa-client-toggle">
-            <button type="button" class="btn-toggle active" data-mode="existing">Client enregistré</button>
-            <button type="button" class="btn-toggle" data-mode="passage">Client de passage</button>
-          </div>
-        </div>
+        <input type="hidden" id="r-client-id" />
+        <input type="hidden" id="r-vehicule-id" />
 
-        <!-- Recherche client existant -->
-        <div id="resa-mode-existing">
+        <!-- Client : recherche live, création auto si inconnu -->
+        <div class="form-row">
           <div class="form-group">
-            <label>Rechercher (nom ou plaque)</label>
-            <input type="text" id="r-client-search" placeholder="Tape un nom ou une plaque…" autocomplete="off" />
-            <input type="hidden" id="r-client-id" />
-            <input type="hidden" id="r-vehicule-id" />
-            <div id="r-client-suggest" class="resa-suggest"></div>
-            <div id="r-client-selected" class="resa-selected"></div>
+            <label>Nom du client</label>
+            <input type="text" id="r-client-nom" autocomplete="off" placeholder="Nom complet" />
+          </div>
+          <div class="form-group">
+            <label>Téléphone</label>
+            <input type="tel" id="r-client-telephone" autocomplete="off" inputmode="tel" />
           </div>
         </div>
-
-        <!-- Saisie client de passage -->
-        <div id="resa-mode-passage" style="display:none">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Nom du client</label>
-              <input type="text" id="r-client-nom" />
-            </div>
-            <div class="form-group">
-              <label>Téléphone</label>
-              <input type="tel" id="r-client-telephone" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Type de véhicule</label>
-              <select id="r-vehicule-type"></select>
-            </div>
-          </div>
-        </div>
+        <div id="r-client-suggest" class="resa-suggest"></div>
+        <div id="r-client-selected" class="resa-selected"></div>
+        <p class="resa-client-note">Si le client existe, sélectionnez-le pour pré-remplir. Sinon, sa fiche sera créée automatiquement.</p>
 
         <div class="form-row">
           <div class="form-group">
-            <label>Date</label>
-            <input type="date" id="r-date" required />
+            <label>Type de véhicule</label>
+            <select id="r-vehicule-type"></select>
           </div>
-          <div class="form-group">
-            <label>Heure</label>
-            <input type="time" id="r-heure" required />
+        </div>
+
+        <!-- Date : calendrier -->
+        <div class="form-group">
+          <label>Date</label>
+          <input type="hidden" id="r-date" />
+          <div class="resa-cal">
+            <div class="resa-cal-head">
+              <button type="button" class="resa-cal-nav" id="r-cal-prev" aria-label="Mois précédent">‹</button>
+              <span class="resa-cal-month" id="r-cal-month"></span>
+              <button type="button" class="resa-cal-nav" id="r-cal-next" aria-label="Mois suivant">›</button>
+            </div>
+            <div class="resa-cal-grid" id="r-cal-dow"></div>
+            <div class="resa-cal-grid" id="r-cal-grid"></div>
           </div>
+        </div>
+
+        <!-- Créneau disponible -->
+        <div class="form-group">
+          <label>Créneau</label>
+          <input type="hidden" id="r-heure" />
+          <div class="resa-slots" id="r-slots"></div>
+          <p class="resa-slots-hint" id="r-slots-hint">Sélectionnez d'abord une date.</p>
         </div>
 
         <div class="form-row">

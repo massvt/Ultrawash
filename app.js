@@ -2503,7 +2503,11 @@ function resaSort(a, b) {
 
 const resaModal = document.getElementById('resaModal');
 let editingResaId = null;
-let resaMode = 'existing'; // 'existing' | 'passage'
+
+// Calendrier de la modale réservation
+const RESA_MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const RESA_DOW = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+let resaCalYear, resaCalMonth;
 
 function todayYmd() { return ymd(new Date()); }
 
@@ -2705,40 +2709,145 @@ function openResaModal(id) {
   document.getElementById('r-id').value = id || '';
   document.getElementById('r-client-id').value = '';
   document.getElementById('r-vehicule-id').value = '';
+  document.getElementById('r-date').value = '';
+  document.getElementById('r-heure').value = '';
   document.getElementById('r-client-suggest').innerHTML = '';
   document.getElementById('r-client-selected').innerHTML = '';
-  setResaMode('existing');
+
+  renderResaDow();
+  const t = new Date(); t.setHours(0,0,0,0);
+  resaCalYear = t.getFullYear();
+  resaCalMonth = t.getMonth();
 
   if (id) {
     const r = cache.reservations.find(x => x.id === id);
     if (!r) return;
-    document.getElementById('r-date').value    = r.date_prevue;
-    document.getElementById('r-heure').value   = (r.heure_prevue || '').slice(0,5);
-    document.getElementById('r-type').value    = r.type_lavage || 'Lavage simple';
-    document.getElementById('r-montant').value = r.montant_estime || '';
-    document.getElementById('r-notes').value   = r.notes || '';
+    document.getElementById('r-type').value          = r.type_lavage || 'Lavage simple';
+    document.getElementById('r-montant').value       = r.montant_estime || '';
+    document.getElementById('r-notes').value         = r.notes || '';
+    document.getElementById('r-vehicule-type').value = r.vehicule_type || 'Voiture';
+    document.getElementById('r-date').value          = r.date_prevue || '';
+    document.getElementById('r-heure').value         = (r.heure_prevue || '').slice(0,5);
+    if (r.date_prevue) {
+      const d = new Date(r.date_prevue + 'T00:00:00');
+      resaCalYear = d.getFullYear(); resaCalMonth = d.getMonth();
+    }
     if (r.client_id) {
-      setResaMode('existing');
       const c = cache.clients.find(x => x.id === r.client_id);
-      document.getElementById('r-client-id').value = r.client_id;
+      document.getElementById('r-client-id').value   = r.client_id;
       document.getElementById('r-vehicule-id').value = r.vehicule_id || '';
-      if (c) showSelectedClient(c, r.vehicule_id);
+      if (c) {
+        document.getElementById('r-client-nom').value       = c.nom || '';
+        document.getElementById('r-client-telephone').value = c.telephone || '';
+        showSelectedClient(c, r.vehicule_id);
+      }
     } else {
-      setResaMode('passage');
       document.getElementById('r-client-nom').value       = r.client_nom || '';
       document.getElementById('r-client-telephone').value = r.client_telephone || '';
-      document.getElementById('r-vehicule-type').value    = r.vehicule_type || 'Voiture';
     }
-  } else {
-    // Defaults : aujourd'hui, heure prochaine
-    const now = new Date();
-    document.getElementById('r-date').value  = now.toISOString().slice(0,10);
-    document.getElementById('r-heure').value = now.toTimeString().slice(0,5);
   }
-  // Empêche la sélection d'une date passée dans le date-picker
-  document.getElementById('r-date').min = todayYmd();
+
+  renderResaCal();
+  const d0 = document.getElementById('r-date').value;
+  if (d0) renderResaSlots(d0);
+  else resetResaSlots();
   resaModal.classList.add('show');
 }
+
+// ----- Calendrier + créneaux de la modale -----
+function renderResaDow() {
+  document.getElementById('r-cal-dow').innerHTML = RESA_DOW.map(d => `<div class="resa-cal-dow">${d}</div>`).join('');
+}
+
+function renderResaCal() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  document.getElementById('r-cal-month').textContent = `${RESA_MONTHS[resaCalMonth]} ${resaCalYear}`;
+  document.getElementById('r-cal-prev').disabled = (resaCalYear === today.getFullYear() && resaCalMonth === today.getMonth());
+  const first = new Date(resaCalYear, resaCalMonth, 1);
+  const lead = (first.getDay() + 6) % 7;
+  const days = new Date(resaCalYear, resaCalMonth + 1, 0).getDate();
+  const selected = document.getElementById('r-date').value;
+  let cells = '';
+  for (let i = 0; i < lead; i++) cells += '<div class="resa-cal-day empty"></div>';
+  for (let d = 1; d <= days; d++) {
+    const date = new Date(resaCalYear, resaCalMonth, d);
+    const key = ymd(date);
+    const isPast = date < today;
+    const cls = ['resa-cal-day'];
+    if (isPast) cls.push('past');
+    if (date.getTime() === today.getTime()) cls.push('today');
+    if (key === selected) cls.push('selected');
+    cells += `<div class="${cls.join(' ')}" ${isPast ? '' : `data-date="${key}"`}>${d}</div>`;
+  }
+  const grid = document.getElementById('r-cal-grid');
+  grid.innerHTML = cells;
+  grid.querySelectorAll('[data-date]').forEach(el => {
+    el.addEventListener('click', () => selectResaDate(el.dataset.date));
+  });
+}
+
+function selectResaDate(key) {
+  document.getElementById('r-date').value = key;
+  document.getElementById('r-heure').value = '';
+  renderResaCal();
+  renderResaSlots(key);
+}
+
+function resetResaSlots() {
+  document.getElementById('r-slots').innerHTML = '';
+  const hint = document.getElementById('r-slots-hint');
+  hint.textContent = "Sélectionnez d'abord une date.";
+  hint.style.display = '';
+}
+
+function renderResaSlots(dateStr) {
+  const OPEN = 10, CLOSE = 18;
+  const todayStr = todayYmd();
+  const curH = new Date().getHours();
+  const slots = [];
+  for (let h = OPEN; h <= CLOSE; h++) {
+    if (dateStr === todayStr && h <= curH) continue;
+    const taken = cache.reservations.some(r =>
+      r.id !== editingResaId &&
+      (r.statut === 'prevu' || r.statut === 'arrive') &&
+      r.date_prevue === dateStr &&
+      parseInt((r.heure_prevue || '').slice(0,2), 10) === h
+    );
+    if (taken) continue;
+    slots.push(String(h).padStart(2,'0') + ':00');
+  }
+  // En édition : garder le créneau actuel même s'il est passé / occupé par lui-même
+  const cur = document.getElementById('r-heure').value;
+  if (cur && !slots.includes(cur)) { slots.push(cur); slots.sort(); }
+
+  const wrap = document.getElementById('r-slots');
+  const hint = document.getElementById('r-slots-hint');
+  if (slots.length === 0) {
+    wrap.innerHTML = '';
+    hint.textContent = 'Aucun créneau disponible ce jour-là.';
+    hint.style.display = '';
+    return;
+  }
+  hint.style.display = 'none';
+  wrap.innerHTML = slots.map(h =>
+    `<button type="button" class="resa-slot ${h === cur ? 'selected' : ''}" data-h="${h}">${h}</button>`).join('');
+  wrap.querySelectorAll('.resa-slot').forEach(b => {
+    b.addEventListener('click', () => {
+      document.getElementById('r-heure').value = b.dataset.h;
+      wrap.querySelectorAll('.resa-slot').forEach(x => x.classList.toggle('selected', x === b));
+    });
+  });
+}
+
+document.getElementById('r-cal-prev').addEventListener('click', () => {
+  if (document.getElementById('r-cal-prev').disabled) return;
+  resaCalMonth--; if (resaCalMonth < 0) { resaCalMonth = 11; resaCalYear--; }
+  renderResaCal();
+});
+document.getElementById('r-cal-next').addEventListener('click', () => {
+  resaCalMonth++; if (resaCalMonth > 11) { resaCalMonth = 0; resaCalYear++; }
+  renderResaCal();
+});
 
 function closeResaModal() {
   resaModal.classList.remove('show');
@@ -2748,23 +2857,12 @@ document.getElementById('resaClose').addEventListener('click', closeResaModal);
 resaModal.querySelector('[data-modal-cancel]').addEventListener('click', closeResaModal);
 resaModal.addEventListener('click', (e) => { if (e.target === resaModal) closeResaModal(); });
 
-function setResaMode(mode) {
-  resaMode = mode;
-  document.getElementById('resa-mode-existing').style.display = mode === 'existing' ? '' : 'none';
-  document.getElementById('resa-mode-passage').style.display  = mode === 'passage'  ? '' : 'none';
-  document.querySelectorAll('.resa-client-toggle .btn-toggle').forEach(b => {
-    b.classList.toggle('active', b.dataset.mode === mode);
-  });
-}
-document.querySelectorAll('.resa-client-toggle .btn-toggle').forEach(b => {
-  b.addEventListener('click', () => setResaMode(b.dataset.mode));
-});
-
-// Recherche client (debounced) sur cache local
+// Recherche client live (debounced) sur les champs Nom et Téléphone
 let resaSearchTimer = null;
-document.getElementById('r-client-search').addEventListener('input', (ev) => {
+function resaClientSearch(ev) {
   clearTimeout(resaSearchTimer);
   const q = ev.target.value.trim().toLowerCase();
+  // Retaper délie le client précédemment sélectionné
   document.getElementById('r-client-id').value = '';
   document.getElementById('r-vehicule-id').value = '';
   document.getElementById('r-client-selected').innerHTML = '';
@@ -2774,32 +2872,33 @@ document.getElementById('r-client-search').addEventListener('input', (ev) => {
     const matches = [];
     cache.clients.forEach(c => {
       const vehs = cache.vehicules.filter(v => v.client_id === c.id);
-      const hitNom = c.nom.toLowerCase().includes(q) || (c.telephone || '').toLowerCase().includes(q);
-      const hitVeh = vehs.find(v => v.plaque.toLowerCase().includes(q));
-      if (hitNom || hitVeh) matches.push({ client: c, vehicule: hitVeh || vehs[0] || null });
+      const hit = c.nom.toLowerCase().includes(q)
+        || (c.telephone || '').toLowerCase().includes(q)
+        || vehs.some(v => v.plaque.toLowerCase().includes(q));
+      if (hit) matches.push(c);
     });
-    if (matches.length === 0) {
-      sug.innerHTML = '<div class="resa-suggest-empty">Aucun client trouvé. Bascule sur "Client de passage".</div>';
-      return;
-    }
-    sug.innerHTML = matches.slice(0, 8).map((m, i) => `
+    if (matches.length === 0) { sug.innerHTML = ''; return; }
+    sug.innerHTML = matches.slice(0, 6).map((c, i) => `
       <div class="resa-suggest-item" data-i="${i}">
-        <b>${escapeHtml(m.client.nom)}</b>
-        ${m.client.telephone ? '· ' + escapeHtml(m.client.telephone) : ''}
-        ${m.vehicule ? '· ' + escapeHtml(m.vehicule.plaque) : ''}
+        <b>${escapeHtml(c.nom)}</b>
+        ${c.telephone ? '· ' + escapeHtml(c.telephone) : ''}
       </div>`).join('');
     sug.querySelectorAll('.resa-suggest-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const m = matches[Number(el.dataset.i)];
-        document.getElementById('r-client-id').value = m.client.id;
-        document.getElementById('r-vehicule-id').value = m.vehicule ? m.vehicule.id : '';
-        document.getElementById('r-client-search').value = '';
-        sug.innerHTML = '';
-        showSelectedClient(m.client, m.vehicule ? m.vehicule.id : null);
-      });
+      el.addEventListener('click', () => pickResaClient(matches[Number(el.dataset.i)]));
     });
   }, 200);
-});
+}
+document.getElementById('r-client-nom').addEventListener('input', resaClientSearch);
+document.getElementById('r-client-telephone').addEventListener('input', resaClientSearch);
+
+function pickResaClient(client) {
+  document.getElementById('r-client-id').value = client.id;
+  document.getElementById('r-client-nom').value = client.nom || '';
+  document.getElementById('r-client-telephone').value = client.telephone || '';
+  document.getElementById('r-client-suggest').innerHTML = '';
+  const vehs = cache.vehicules.filter(v => v.client_id === client.id);
+  showSelectedClient(client, vehs.length === 1 ? vehs[0].id : null);
+}
 
 function showSelectedClient(client, vehiculeId) {
   const vehs = cache.vehicules.filter(v => v.client_id === client.id);
@@ -2831,89 +2930,62 @@ function showSelectedClient(client, vehiculeId) {
 
 document.getElementById('formResa').addEventListener('submit', async (ev) => {
   ev.preventDefault();
+  const dateVal  = document.getElementById('r-date').value;
+  const heureVal = document.getElementById('r-heure').value;
+  if (!dateVal)  { toast('Choisis une date dans le calendrier', '#e53935'); return; }
+  if (!heureVal) { toast('Choisis un créneau', '#e53935'); return; }
+
+  const nom = document.getElementById('r-client-nom').value.trim();
+  if (!nom) { toast('Nom du client requis', '#e53935'); return; }
+  const telephone = document.getElementById('r-client-telephone').value.trim() || null;
+
   const row = {
-    date_prevue:  document.getElementById('r-date').value,
-    heure_prevue: document.getElementById('r-heure').value,
+    date_prevue:  dateVal,
+    heure_prevue: heureVal,
     type_lavage:  document.getElementById('r-type').value,
     montant_estime: Number(document.getElementById('r-montant').value) || null,
     notes:        document.getElementById('r-notes').value.trim() || null,
   };
 
-  // 1) Refuser une date dans le passé (et une heure passée si c'est aujourd'hui)
-  const today = todayYmd();
-  if (row.date_prevue < today) {
+  // 1) Refuser une date passée (filet ; le calendrier l'empêche déjà)
+  if (dateVal < todayYmd()) {
     toast('Impossible de réserver à une date passée', '#e53935');
     return;
-  }
-  if (row.date_prevue === today) {
-    const nowHM = new Date().toTimeString().slice(0,5);
-    if (row.heure_prevue < nowHM) {
-      toast(`Heure passée — il est déjà ${nowHM}`, '#e53935');
-      return;
-    }
   }
 
   // 2) Refuser un conflit de créneau (même date + même heure, statut prevu)
   const conflict = cache.reservations.find(r =>
     r.id !== editingResaId &&
     r.statut === 'prevu' &&
-    r.date_prevue === row.date_prevue &&
-    (r.heure_prevue || '').slice(0,5) === row.heure_prevue
+    r.date_prevue === dateVal &&
+    (r.heure_prevue || '').slice(0,5) === heureVal
   );
   if (conflict) {
-    toast(`Conflit de créneau : déjà réservé à ${row.heure_prevue} pour ${clientLabel(conflict)}`, '#e53935');
+    toast(`Créneau déjà réservé à ${heureVal} pour ${clientLabel(conflict)}`, '#e53935');
     return;
   }
 
-  if (resaMode === 'existing') {
-    const cid = document.getElementById('r-client-id').value;
-    if (!cid) { toast('Sélectionne un client (ou bascule sur "Client de passage")', '#e53935'); return; }
-    const vid = document.getElementById('r-vehicule-id').value || null;
-    row.client_id   = cid;
-    row.vehicule_id = vid;
-    // Snapshot : on fige nom/tél dans la ligne résa pour que l'historique
-    // reste lisible si le client est supprimé. La plaque vit sur la fiche
-    // client (véhicules) ; on l'affiche via vehicule_id, pas en snapshot.
-    const c = cache.clients.find(x => x.id === cid) || null;
-    row.client_nom        = c ? c.nom : null;
-    row.client_telephone  = c ? (c.telephone || null) : null;
-    row.plaque            = null;
-    row.vehicule_type     = null;
-  } else {
-    const nom = document.getElementById('r-client-nom').value.trim();
-    if (!nom) { toast('Nom du client requis', '#e53935'); return; }
-    const telephone = document.getElementById('r-client-telephone').value.trim() || null;
-
-    // 3) Si le téléphone correspond déjà à un client, on propose la bascule en mode "existant"
-    if (telephone) {
-      let cli = cache.clients.find(c => c.telephone === telephone);
-      // Filet via Supabase (au cas où le cache n'est pas chargé)
-      if (!cli) {
-        const { data } = await sb.from('clients').select('id, nom').eq('telephone', telephone).limit(1);
-        if (data && data[0]) cli = data[0];
-      }
-      if (cli) {
-        if (confirm(`Le numéro ${telephone} correspond déjà à : ${cli.nom}.\nBasculer sur ce client enregistré ?`)) {
-          // Bascule automatique
-          if (!cache.clientsLoaded) await DB.loadClients();
-          setResaMode('existing');
-          document.getElementById('r-client-id').value   = cli.id;
-          document.getElementById('r-vehicule-id').value = '';
-          const c = cache.clients.find(x => x.id === cli.id);
-          if (c) showSelectedClient(c, null);
-          toast('Client trouvé — vérifie puis clique Enregistrer', '#1e40af');
-        }
-        return; // dans tous les cas, on stoppe ici (l'utilisateur valide manuellement)
-      }
-    }
-
-    row.client_id   = null;
-    row.vehicule_id = null;
-    row.client_nom        = nom;
-    row.client_telephone  = telephone;
-    row.plaque            = null;
-    row.vehicule_type     = document.getElementById('r-vehicule-type').value;
+  // 3) Déterminer le client : lié → existant par téléphone → sinon création auto
+  if (!cache.clientsLoaded) await DB.loadClients();
+  let clientId = document.getElementById('r-client-id').value || null;
+  if (!clientId && telephone) {
+    const existing = cache.clients.find(c => c.telephone === telephone);
+    if (existing) clientId = existing.id;
   }
+  if (!clientId) {
+    const newClient = await DB.addClient({ type: 'particulier', nom, telephone });
+    if (!newClient) return; // erreur déjà signalée par addClient
+    clientId = newClient.id;
+    toast('Nouvelle fiche client créée', '#0d9e6e');
+  }
+
+  const c = cache.clients.find(x => x.id === clientId) || null;
+  row.client_id        = clientId;
+  row.vehicule_id      = document.getElementById('r-vehicule-id').value || null;
+  row.client_nom       = c ? c.nom : nom;
+  row.client_telephone = c ? (c.telephone || null) : telephone;
+  row.plaque           = null;
+  row.vehicule_type    = document.getElementById('r-vehicule-type').value || null;
 
   let saved;
   if (editingResaId) saved = await DB.updateReservation(editingResaId, row);

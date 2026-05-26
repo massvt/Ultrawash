@@ -965,6 +965,28 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .resa-suggest-item:hover { background: #f0f9ff; }
 .resa-suggest-empty { padding: 10px 12px; color: var(--gray-400); font-style: italic; font-size: .85rem; }
 
+.resa-client-note { color: var(--gray-400); font-size: .8rem; margin: 6px 0 4px; }
+
+/* Calendrier + créneaux de la modale réservation */
+.resa-cal { border: 1px solid var(--gray-100); border-radius: 10px; padding: 10px; }
+.resa-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.resa-cal-month { font-weight: 700; text-transform: capitalize; }
+.resa-cal-nav { width: 32px; height: 32px; border: 1px solid var(--gray-100); background: #fff; border-radius: 8px; cursor: pointer; font-size: 1rem; line-height: 1; }
+.resa-cal-nav:disabled { opacity: .35; cursor: not-allowed; }
+.resa-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.resa-cal-dow { text-align: center; font-size: .68rem; font-weight: 700; color: var(--gray-400); text-transform: uppercase; padding-bottom: 2px; }
+.resa-cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: #f1f5f9; cursor: pointer; font-size: .9rem; border: 1px solid transparent; }
+.resa-cal-day.empty { background: transparent; cursor: default; }
+.resa-cal-day.past { color: #cbd5e1; background: transparent; cursor: not-allowed; }
+.resa-cal-day.today { box-shadow: inset 0 0 0 1px var(--blue); font-weight: 800; }
+.resa-cal-day.selected { background: var(--blue); color: #fff; font-weight: 700; }
+.resa-cal-day:not(.empty):not(.past):hover { border-color: var(--blue); }
+.resa-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+.resa-slot { padding: 9px 4px; border: 1px solid var(--gray-100); border-radius: 8px; background: #fff; cursor: pointer; font-size: .95rem; }
+.resa-slot:hover { border-color: var(--blue); }
+.resa-slot.selected { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 700; }
+.resa-slots-hint { color: var(--gray-400); font-size: .85rem; margin: 6px 0 0; }
+
 .resa-selected { margin-top: 8px; }
 .resa-selected-card {
   background: #ecfdf5;
