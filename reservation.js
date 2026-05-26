@@ -126,11 +126,16 @@ function openForm() {
   $('cardForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// Libellé complet de la prestation : "Lavage <type>" (ex: "Lavage 4x4")
+function serviceLabel(type) {
+  return type ? 'Lavage ' + type : '';
+}
+
 function updateRecap() {
   const type = $('f-vehtype').value;
   $('recap').innerHTML =
     `📅 <b>${frDate(state.date)}</b> à <b>${state.heure}</b>` +
-    (type ? `<br>🧽 ${escapeHtml(type)}` : '');
+    (type ? `<br>🧽 ${escapeHtml(serviceLabel(type))}` : '');
 }
 
 $('f-vehtype').addEventListener('change', updateRecap);
@@ -190,7 +195,7 @@ function showConfirmation() {
   $('confirm').classList.remove('hidden');
   $('confirmDetail').innerHTML =
     `Le <b>${frDate(state.date)}</b> à <b>${state.heure}</b>` +
-    (type ? `<br>${escapeHtml(type)}` : '');
+    (type ? `<br>${escapeHtml(serviceLabel(type))}` : '');
   $('confirm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
