@@ -828,21 +828,14 @@ setDefaultDateTime();
 document.getElementById('formEntree').addEventListener('submit', async (ev) => {
   ev.preventDefault();
 
-  // Empêcher l'enregistrement d'une entrée dans le passé
+  // Empêcher l'enregistrement à une date antérieure (une heure passée le
+  // jour même reste autorisée : on saisit parfois un lavage après coup).
   const dateVal  = document.getElementById('e-date').value;
-  const heureVal = document.getElementById('e-heure').value;
   const now = new Date();
   const today = ymd(now);
   if (dateVal < today) {
     toast('Date antérieure interdite', '#e53935');
     return;
-  }
-  if (dateVal === today) {
-    const nowHM = now.toTimeString().slice(0, 5);
-    if (heureVal < nowHM) {
-      toast('Heure antérieure interdite', '#e53935');
-      return;
-    }
   }
 
   const telephone = (document.getElementById('e-telephone').value || '').trim();
