@@ -442,6 +442,54 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
+// ===== RAFRAÎCHISSEMENT AUTOMATIQUE =====
+// Les données vivent dans un cache local : on les re-synchronise
+// périodiquement pour refléter les changements faits ailleurs (autre
+// agent, réservation en ligne, etc.) sans recharger la page à la main.
+const AUTO_REFRESH_SECONDS = 30; // intervalle ajustable
+let autoRefreshing = false;
+
+// Re-rend la page actuellement affichée (depuis le cache fraîchement chargé)
+function renderActivePage() {
+  const active = document.querySelector('.page.active');
+  if (!active) return;
+  switch (active.id) {
+    case 'page-dashboard':     renderDashboard(); refreshDashResaToday(); break;
+    case 'page-entrees':       renderEntreesList(); break;
+    case 'page-sorties':       renderSortiesList(); break;
+    case 'page-clients':       renderClientsPage(); break;
+    case 'page-reservations':  renderReservationsList(); break;
+    case 'page-historique':    renderHistorique(); break;
+    case 'page-tarifs':        renderTarifsPage(); break;
+    case 'page-vehicules':     renderVehiculesPage(); break;
+    case 'page-utilisateurs':  renderUsersPage(); break;
+  }
+}
+
+async function autoRefresh() {
+  if (autoRefreshing) return;                                    // déjà en cours
+  if (!session.user) return;                                     // pas connecté
+  if (document.hidden) return;                                   // onglet en arrière-plan
+  if (document.querySelector('.modal-overlay.show')) return;     // saisie dans une fenêtre
+  const ae = document.activeElement;                             // saisie en cours sur un champ
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+  autoRefreshing = true;
+  try {
+    await DB.loadAll();
+    if (cache.clientsLoaded) await DB.loadClients();
+    renderActivePage();
+    updateResaBadge();
+  } catch (e) {
+    console.error('Auto-refresh:', e);
+  } finally {
+    autoRefreshing = false;
+  }
+}
+
+setInterval(autoRefresh, AUTO_REFRESH_SECONDS * 1000);
+// Re-synchronise aussi dès qu'on revient sur l'onglet
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
+
 // ===== TOAST =====
 function toast(msg, color = '#0d9e6e') {
   const t = document.getElementById('toast');
