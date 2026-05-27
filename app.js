@@ -3157,8 +3157,8 @@ function renderReservationsList() {
         <td>${r.montant_estime ? fmt(r.montant_estime) : '—'}</td>
         <td><span class="statut-pill statut-${r.statut}">${statutLabel(r.statut)}</span></td>
         <td class="resa-actions">
-          ${r.statut === 'prevu' ? `<button class="btn-mini btn-ok" data-act="arrive" data-id="${r.id}" title="Marquer arrivé">✓ Arrivé</button>` : ''}
-          ${r.statut === 'prevu' && resaClientPhone(r) ? `<button class="btn-mini btn-wa" data-act="wa" data-id="${r.id}" title="Envoyer la confirmation au client sur WhatsApp">📲 WhatsApp</button>` : ''}
+          ${r.statut === 'prevu' ? `<button class="btn-mini btn-ok" data-act="arrive" data-id="${r.id}" title="Marquer arrivé">✓</button>` : ''}
+          ${r.statut === 'prevu' && resaClientPhone(r) ? `<button class="btn-mini btn-wa" data-act="wa" data-id="${r.id}" title="Envoyer la confirmation au client sur WhatsApp">📲</button>` : ''}
           ${r.statut === 'prevu' ? `<button class="btn-mini btn-edit" data-act="edit" data-id="${r.id}" title="Modifier">✎</button>` : ''}
           ${r.statut === 'prevu' ? `<button class="btn-mini btn-cancel" data-act="annuler" data-id="${r.id}" title="Annuler">⊘</button>` : ''}
           ${canDelete ? `<button class="btn-mini btn-del" data-act="del" data-id="${r.id}" title="Supprimer">✕</button>` : ''}
