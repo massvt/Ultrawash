@@ -2840,6 +2840,47 @@ function vehiculeLabel(r) {
   return label || '—';
 }
 
+// ----- Confirmation WhatsApp au client (réservation interne) -----
+// Téléphone du client lié à une résa (fiche liée prioritaire, sinon snapshot)
+function resaClientPhone(r) {
+  if (r.client_id) {
+    const c = cache.clients.find(x => x.id === r.client_id);
+    if (c && c.telephone) return c.telephone;
+  }
+  return r.client_telephone || null;
+}
+// Normalise un numéro saisi librement vers le format wa.me (international, sans +)
+// Hypothèse Sénégal (+221) pour un numéro local à 9 chiffres.
+function waNumber(tel) {
+  let d = String(tel || '').replace(/\D/g, '');
+  if (!d) return null;
+  if (d.startsWith('221')) return d;
+  d = d.replace(/^0+/, '');
+  if (d.length === 9) return '221' + d;
+  return d;
+}
+function resaClientName(r) {
+  if (r.client_id) {
+    const c = cache.clients.find(x => x.id === r.client_id);
+    if (c && c.nom) return c.nom;
+  }
+  return r.client_nom || 'cher client';
+}
+// Lien wa.me vers le client avec un message de confirmation pré-rempli
+function resaWaLink(r) {
+  const num = waNumber(resaClientPhone(r));
+  if (!num) return null;
+  const heure = (r.heure_prevue || '').slice(0, 5);
+  const lignes = [
+    `Bonjour ${resaClientName(r)}, votre réservation chez UltraWash est confirmée ✅`,
+    `📅 ${fmtDate(r.date_prevue)} à ${heure}`,
+  ];
+  const presta = r.type_lavage || (r.vehicule_type ? 'Lavage ' + r.vehicule_type : '');
+  if (presta) lignes.push(`🧽 ${presta}`);
+  lignes.push('À très vite !');
+  return `https://wa.me/${num}?text=${encodeURIComponent(lignes.join('\n'))}`;
+}
+
 async function renderReservationsPage() {
   // Pour la recherche client dans la modale, on lazy-load les clients aussi
   if (!cache.clientsLoaded) await DB.loadClients();
@@ -3114,6 +3155,7 @@ function renderReservationsList() {
         <td><span class="statut-pill statut-${r.statut}">${statutLabel(r.statut)}</span></td>
         <td class="resa-actions">
           ${r.statut === 'prevu' ? `<button class="btn-mini btn-ok" data-act="arrive" data-id="${r.id}" title="Marquer arrivé">✓ Arrivé</button>` : ''}
+          ${r.statut === 'prevu' && resaClientPhone(r) ? `<button class="btn-mini btn-wa" data-act="wa" data-id="${r.id}" title="Envoyer la confirmation au client sur WhatsApp">📲 WhatsApp</button>` : ''}
           ${r.statut === 'prevu' ? `<button class="btn-mini btn-edit" data-act="edit" data-id="${r.id}" title="Modifier">✎</button>` : ''}
           ${r.statut === 'prevu' ? `<button class="btn-mini btn-cancel" data-act="annuler" data-id="${r.id}" title="Annuler">⊘</button>` : ''}
           ${canDelete ? `<button class="btn-mini btn-del" data-act="del" data-id="${r.id}" title="Supprimer">✕</button>` : ''}
@@ -3159,6 +3201,12 @@ async function onResaAction(action, id) {
   const r = cache.reservations.find(x => x.id === id);
   if (!r) return;
   if (action === 'edit') return openResaModal(id);
+  if (action === 'wa') {
+    const link = resaWaLink(r);
+    if (!link) { toast('Aucun numéro de téléphone pour ce client', '#e53935'); return; }
+    window.open(link, '_blank');
+    return;
+  }
   if (action === 'annuler') {
     if (!confirm('Annuler cette réservation ?')) return;
     const ok = await DB.updateReservation(id, { statut: 'annule' });
@@ -3528,11 +3576,14 @@ guardedSubmit(document.getElementById('formResa'), async (ev) => {
     saved = await DB.addReservation(row);
   }
   if (!saved) return;
+  const wasEdit = !!editingResaId;
   closeResaModal();
   renderReservationsList();
   updateResaBadge();
   refreshDashResaToday();
-  toast(editingResaId ? 'Réservation mise à jour' : 'Réservation enregistrée');
+  if (wasEdit) toast('Réservation mise à jour');
+  else if (telephone) toast('Réservation enregistrée — 📲 confirmez le client sur WhatsApp');
+  else toast('Réservation enregistrée');
 });
 
 // ----- Widget dashboard : RDV du jour -----

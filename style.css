@@ -939,6 +939,8 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .btn-mini.btn-cancel { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .btn-mini.btn-edit { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
 .btn-mini.btn-del { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.btn-mini.btn-wa { background: #25d366; color: #fff; border-color: #1ebe5d; }
+.btn-mini.btn-wa:hover { background: #1ebe5d; }
 
 .resa-client-toggle { display: flex; gap: 6px; }
 .btn-toggle {
