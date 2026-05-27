@@ -131,6 +131,10 @@
     .closed-banner .closed-ico{font-size:3rem;margin-bottom:10px}
     .closed-banner h2{color:var(--ink);margin:0 0 10px;font-size:1.25rem}
     .closed-banner p{color:var(--muted);margin:0;font-size:1rem}
+    .closed-actions{margin:20px 0 0;display:flex;flex-direction:column;gap:8px}
+    .closed-actions p{color:var(--ink);font-weight:600}
+    .closed-actions a{color:var(--ink);font-weight:700;text-decoration:none}
+    .closed-sign{margin-top:20px!important;color:var(--ink)!important;font-weight:600;line-height:1.5}
 
     footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:26px}
   </style>
@@ -154,9 +158,14 @@
   <main class="wrap">
     <!-- Bannière : réservations fermées (forte affluence) -->
     <div class="card closed-banner hidden" id="closedBanner">
-      <div class="closed-ico">⏸️</div>
+      <div class="closed-ico">⛔</div>
       <h2>Réservations en ligne fermées</h2>
-      <p id="closedMessage"></p>
+      <p id="closedMessage">Forte affluence en cours — la réservation en ligne est temporairement indisponible.</p>
+      <div class="closed-actions">
+        <p>📞 Appelez-nous : <a href="tel:+221785871514">78 587 15 14</a></p>
+        <p>🔄 Ou réessayez plus tard</p>
+      </div>
+      <p class="closed-sign">À très vite !<br>L'équipe UltraWash</p>
     </div>
 
     <!-- Parcours de réservation -->

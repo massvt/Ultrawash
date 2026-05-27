@@ -251,7 +251,6 @@ async function boot() {
   if (st && st.is_open === false) {
     $('flow').classList.add('hidden');
     $('stepper').classList.add('hidden');
-    $('closedMessage').textContent = st.closed_message || 'Les réservations en ligne sont momentanément fermées.';
     $('closedBanner').classList.remove('hidden');
     return;
   }
