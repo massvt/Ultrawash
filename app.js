@@ -3621,7 +3621,7 @@ function refreshDashResaToday() {
       <td>${escapeHtml(vehiculeLabel(r))}</td>
       <td>${escapeHtml(r.type_lavage || '—')}</td>
       <td><span class="statut-pill statut-${r.statut}">${statutLabel(r.statut)}</span></td>
-      <td>${r.statut === 'prevu' ? `<button class="btn-mini btn-ok" data-dash-arrive="${r.id}">✓ Arrivé</button>` : ''}</td>
+      <td>${r.statut === 'prevu' ? `<button class="btn-mini btn-ok" data-dash-arrive="${r.id}" title="Marquer arrivé">✓</button>` : ''}</td>
     </tr>`).join('');
   tbody.querySelectorAll('[data-dash-arrive]').forEach(b => {
     b.addEventListener('click', async () => {
