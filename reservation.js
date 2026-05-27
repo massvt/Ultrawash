@@ -213,6 +213,9 @@ function showError(msg) {
   err.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+// Numéro WhatsApp d'UltraWash (format international, sans + ni espaces)
+const ULTRAWASH_WA = '221785871514';
+
 function showConfirmation() {
   const type = $('f-vehtype').value;
   setStep(4); // toutes les étapes terminées
@@ -221,6 +224,18 @@ function showConfirmation() {
   $('confirmDetail').innerHTML =
     `Le <b>${frDate(state.date)}</b> à <b>${state.heure}</b>` +
     (type ? `<br>${escapeHtml(serviceLabel(type))}` : '');
+
+  // Lien WhatsApp pré-rempli vers UltraWash (confirmation côté client)
+  const nom = $('f-nom').value.trim();
+  const lignes = [
+    'Bonjour UltraWash, je confirme ma réservation :',
+    `👤 ${nom}`,
+    `📅 ${frDate(state.date)} à ${state.heure}`,
+  ];
+  if (type) lignes.push(`🧽 ${serviceLabel(type)}`);
+  const msg = lignes.join('\n');
+  $('confirmWa').href = `https://wa.me/${ULTRAWASH_WA}?text=${encodeURIComponent(msg)}`;
+
   $('confirm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

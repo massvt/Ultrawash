@@ -500,6 +500,115 @@ setInterval(autoRefresh, AUTO_REFRESH_SECONDS * 1000);
 // Re-synchronise aussi dès qu'on revient sur l'onglet
 document.addEventListener('visibilitychange', () => { if (!document.hidden) autoRefresh(); });
 
+// ===== Alerte nouvelle réservation en ligne =====
+// Détecte les résas faites par les clients via le lien public (source='public')
+// et prévient l'équipe : bip sonore + bandeau in-app + notification bureau.
+// Le poll est indépendant de autoRefresh pour fonctionner même onglet caché.
+const ONLINE_SEEN_KEY = 'uw_seen_online_resa';
+let onlineSeen     = null;   // Set des IDs déjà vus (null = pas encore initialisé)
+let onlineAudioCtx = null;   // débloqué au 1er geste (politique d'autoplay)
+let onlineAlertTimer = null;
+
+function loadOnlineSeen() {
+  try {
+    const raw = localStorage.getItem(ONLINE_SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw)) : null;
+  } catch { return null; }
+}
+function saveOnlineSeen() {
+  try { localStorage.setItem(ONLINE_SEEN_KEY, JSON.stringify([...onlineSeen])); } catch {}
+}
+
+// L'audio doit être débloqué par un geste utilisateur avant de pouvoir sonner.
+function unlockOnlineAudio() {
+  if (onlineAudioCtx) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) onlineAudioCtx = new Ctx();
+  } catch {}
+}
+document.addEventListener('click',   unlockOnlineAudio, { once: true });
+document.addEventListener('keydown', unlockOnlineAudio, { once: true });
+
+function playOnlineBeep() {
+  if (!onlineAudioCtx) return;
+  try {
+    if (onlineAudioCtx.state === 'suspended') onlineAudioCtx.resume();
+    const now = onlineAudioCtx.currentTime;
+    // Petit « ding-dong » de deux notes
+    [[880, 0], [1175, 0.18]].forEach(([freq, t]) => {
+      const osc  = onlineAudioCtx.createOscillator();
+      const gain = onlineAudioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now + t);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.35);
+      osc.connect(gain).connect(onlineAudioCtx.destination);
+      osc.start(now + t);
+      osc.stop(now + t + 0.4);
+    });
+  } catch {}
+}
+
+function notifyOnline(title, body) {
+  try {
+    if (('Notification' in window) && Notification.permission === 'granted') {
+      new Notification(title, { body, tag: 'uw-online-resa', renotify: true });
+    }
+  } catch {}
+}
+
+async function checkNewOnlineBookings() {
+  if (!session.user) return;
+  const { data, error } = await sb.from('reservations')
+    .select('id, client_nom, date_prevue, heure_prevue')
+    .eq('source', 'public')
+    .eq('statut', 'prevu');
+  if (error || !data) return;
+
+  if (onlineSeen === null) onlineSeen = loadOnlineSeen();
+  // Tout premier passage (aucun historique local) : on mémorise sans alerter,
+  // sinon on notifierait toutes les résas déjà existantes.
+  if (onlineSeen === null) {
+    onlineSeen = new Set(data.map(r => r.id));
+    saveOnlineSeen();
+    return;
+  }
+
+  const nouvelles = data.filter(r => !onlineSeen.has(r.id));
+  // On borne l'ensemble vu aux résas en ligne encore "prévu" (évite qu'il enfle).
+  onlineSeen = new Set(data.map(r => r.id));
+  saveOnlineSeen();
+  if (nouvelles.length === 0) return;
+
+  playOnlineBeep();
+  if (nouvelles.length === 1) {
+    const r = nouvelles[0];
+    const heure = (r.heure_prevue || '').slice(0, 5);
+    const qui   = r.client_nom || 'Client';
+    toast(`🌐 Nouvelle réservation en ligne : ${qui} le ${fmtDate(r.date_prevue)} à ${heure}`, '#1557b0');
+    notifyOnline('Nouvelle réservation en ligne', `${qui} — ${fmtDate(r.date_prevue)} à ${heure}`);
+  } else {
+    toast(`🌐 ${nouvelles.length} nouvelles réservations en ligne`, '#1557b0');
+    notifyOnline('Nouvelles réservations en ligne', `${nouvelles.length} réservations reçues`);
+  }
+
+  // Onglet visible : on resynchronise l'UI (badge, tableau, tableau de bord).
+  if (!document.hidden) autoRefresh();
+}
+
+function startOnlineAlerts() {
+  try {
+    if (('Notification' in window) && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  } catch {}
+  checkNewOnlineBookings();
+  if (onlineAlertTimer) clearInterval(onlineAlertTimer);
+  onlineAlertTimer = setInterval(checkNewOnlineBookings, AUTO_REFRESH_SECONDS * 1000);
+}
+
 // ===== TOAST =====
 function toast(msg, color = '#0d9e6e') {
   const t = document.getElementById('toast');
@@ -1964,6 +2073,7 @@ async function startApp() {
   }
   updateResaBadge();
   refreshDashResaToday();
+  startOnlineAlerts();
 }
 
 const PHONE_EMAIL_DOMAIN = 'ultrawash.local';

@@ -107,6 +107,12 @@
     .btn-primary:hover{filter:brightness(1.05)}
     .btn-primary:active{transform:translateY(1px)}
     .btn-primary:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+    .btn-wa{background:linear-gradient(160deg,#25d366,#128c4b);color:#fff;box-shadow:0 8px 18px rgba(18,140,75,.32);text-decoration:none}
+    .btn-wa:hover{filter:brightness(1.05)}
+    .btn-wa:active{transform:translateY(1px)}
+    .btn-ghost{background:transparent;color:#1557b0;border:1.5px solid #d6e2f5}
+    .btn-ghost:hover{background:#f0f5fd}
+    .confirm-wa-hint{font-size:.9rem;color:#64748b;margin:14px 0 0}
 
     .msg{padding:12px 14px;border-radius:12px;font-size:.92rem;margin-bottom:14px}
     .msg-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
@@ -217,7 +223,9 @@
       <h2>Réservation confirmée !</h2>
       <p id="confirmDetail"></p>
       <p>Nous vous attendons. À très vite chez <b>UltraWash</b> !</p>
-      <button class="btn btn-primary" id="againBtn" style="max-width:280px;margin:20px auto 0">Faire une autre réservation</button>
+      <p class="confirm-wa-hint">Recevez un rappel : envoyez-nous votre confirmation sur WhatsApp.</p>
+      <a class="btn btn-wa" id="confirmWa" target="_blank" rel="noopener" style="max-width:320px;margin:8px auto 0">✅ Confirmer sur WhatsApp</a>
+      <button class="btn btn-ghost" id="againBtn" style="max-width:320px;margin:12px auto 0">Faire une autre réservation</button>
     </div>
 
     <footer>© UltraWash — Réservation en ligne</footer>
