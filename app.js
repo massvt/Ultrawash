@@ -3005,7 +3005,10 @@ function refreshBookingToggle() {
   if (!btn || !isAdmin()) return;
   const open = cache.bookingConfig ? cache.bookingConfig.is_open : true;
   btn.dataset.open = open ? '1' : '0';
-  btn.textContent = open ? '🟢 Réservations en ligne : ouvertes' : '🔴 Réservations en ligne : FERMÉES';
+  btn.textContent = open ? '🟢' : '🔴';
+  btn.title = open
+    ? 'Réservations en ligne ouvertes — cliquer pour fermer'
+    : 'Réservations en ligne FERMÉES — cliquer pour rouvrir';
   btn.classList.toggle('btn-danger', !open);
   btn.classList.toggle('btn-outline', open);
 }
