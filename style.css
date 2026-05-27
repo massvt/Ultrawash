@@ -997,22 +997,25 @@ tr.row-click:hover { background: var(--gray-50, #f9fafb); }
 .bs-add-day input { padding: 9px 11px; border: 1px solid var(--gray-100); border-radius: 8px; font-size: .9rem; font-family: inherit; }
 .bs-add-day input[type="date"] { flex: 0 0 auto; }
 .bs-add-day input[type="text"] { flex: 1; min-width: 120px; }
-.bs-day-list { display: flex; flex-direction: column; gap: 6px; }
-.bs-day-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  background: #f8fafc; border: 1px solid var(--gray-100); border-radius: 8px; padding: 8px 12px; font-size: .9rem; }
+.bs-day-list { display: flex; flex-direction: column; gap: 8px; }
+/* Jours fermés regroupés par mois (accordéon repliable) */
+.bs-month-group { border: 1px solid var(--gray-100); border-radius: 10px; overflow: hidden; background: #fff; }
+.bs-month-group summary { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer;
+  font-size: .9rem; background: #f8fafc; list-style: none; user-select: none; }
+.bs-month-group summary::-webkit-details-marker { display: none; }
+.bs-month-group summary::before { content: '▸'; color: var(--gray-400); font-size: .8rem; transition: transform .15s; }
+.bs-month-group[open] summary::before { transform: rotate(90deg); }
+.bs-month-name { font-weight: 700; color: var(--text); text-transform: capitalize; }
+.bs-month-count { margin-left: auto; font-size: .8rem; color: var(--gray-400); }
+.bs-day-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px; }
+.bs-day-chip { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #b91c1c;
+  border: 1px solid #fecaca; border-radius: 999px; padding: 4px 4px 4px 12px; font-size: .82rem; }
+.bs-day-chip button { border: none; background: transparent; color: #b91c1c; cursor: pointer; font-size: .9rem;
+  line-height: 1; width: 20px; height: 20px; border-radius: 50%; padding: 0; }
+.bs-day-chip button:hover { background: rgba(185,28,28,.18); }
 
-/* Modale réglages : interrupteur + sections */
+/* Modale réglages : sections */
 .modal-card-lg { max-width: 480px; }
-.bs-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  background: #f8fafc; border: 1px solid var(--gray-100); border-radius: 12px; padding: 14px 16px; margin-bottom: 6px; }
-.bs-switch-title { font-weight: 700; color: var(--text); }
-.bs-switch-sub { font-size: .82rem; color: var(--gray-400); margin-top: 2px; }
-.switch { position: relative; width: 50px; height: 28px; border-radius: 999px; border: none; background: #cbd5e1;
-  cursor: pointer; flex: none; transition: background .18s; padding: 0; }
-.switch.on { background: var(--green); }
-.switch-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
-  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: left .18s; }
-.switch.on .switch-knob { left: 25px; }
 .bs-h4 { margin: 18px 0 12px; font-size: .95rem; color: var(--text); }
 .bs-block { border-top: 1px solid var(--gray-100); margin-top: 18px; padding-top: 6px; }
 

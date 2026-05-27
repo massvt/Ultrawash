@@ -2954,7 +2954,9 @@ async function toggleClosedDay(key) {
   renderClosedDays();
 }
 
-// Récap des jours fermés à venir (sous le calendrier)
+// Récap des jours fermés à venir (sous le calendrier), regroupés par mois.
+// Sections repliables (le 1er mois ouvert) + puces compactes : reste lisible
+// même avec beaucoup de jours sur plusieurs mois/années.
 async function renderClosedDays() {
   const wrap = document.getElementById('bs-day-list');
   if (!wrap) return;
@@ -2964,12 +2966,34 @@ async function renderClosedDays() {
     wrap.innerHTML = '<p class="resa-client-note" style="margin:0">Aucun jour fermé à venir.</p>';
     return;
   }
-  wrap.innerHTML = list.map(d => `
-    <div class="bs-day-row">
-      <span><b>${fmtDate(d.day)}</b>${d.reason ? ' · ' + escapeHtml(d.reason) : ''}</span>
-      <button type="button" class="btn-mini btn-del" data-day="${d.day}" title="Rouvrir ce jour">✕</button>
-    </div>`).join('');
-  wrap.querySelectorAll('[data-day]').forEach(b =>
+  // Regroupe par mois ('YYYY-MM'), en conservant l'ordre chronologique
+  const groups = new Map();
+  list.forEach(d => {
+    const key = d.day.slice(0, 7);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d);
+  });
+  let first = true;
+  let html = '';
+  for (const [key, days] of groups) {
+    const [y, m] = key.split('-').map(Number);
+    const n = days.length;
+    const chips = days.map(d => {
+      const lbl = new Date(d.day + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+      const titre = d.reason ? `${lbl} · ${escapeHtml(d.reason)}` : lbl;
+      return `<span class="bs-day-chip"><span>${titre}</span>
+        <button type="button" data-day="${d.day}" title="Rouvrir ce jour">✕</button></span>`;
+    }).join('');
+    html += `
+      <details class="bs-month-group"${first ? ' open' : ''}>
+        <summary><span class="bs-month-name">${RESA_MONTHS[m - 1]} ${y}</span>
+          <span class="bs-month-count">${n} jour${n > 1 ? 's' : ''}</span></summary>
+        <div class="bs-day-chips">${chips}</div>
+      </details>`;
+    first = false;
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('button[data-day]').forEach(b =>
     b.addEventListener('click', () => toggleClosedDay(b.dataset.day)));
 }
 
@@ -3013,19 +3037,6 @@ function refreshBookingToggle() {
   btn.classList.toggle('btn-outline', open);
 }
 
-// Met à jour l'interrupteur de la modale Réglages
-function updateBsStateSwitch() {
-  const sw = document.getElementById('bsStateSwitch');
-  if (!sw) return;
-  const open = cache.bookingConfig ? cache.bookingConfig.is_open : true;
-  sw.classList.toggle('on', open);
-  sw.setAttribute('aria-checked', open ? 'true' : 'false');
-  const sub = document.getElementById('bsStateSub');
-  if (sub) sub.textContent = open
-    ? 'Ouvertes — les clients peuvent réserver via le lien.'
-    : 'Fermées — le lien public affiche un message d’indisponibilité.';
-}
-
 // Écrit le nouvel état en base + rafraîchit l'UI (renvoie true si OK)
 async function setBookingOpen(next) {
   const { data, error } = await sb.from('booking_config')
@@ -3039,7 +3050,6 @@ async function setBookingOpen(next) {
   }
   cache.bookingConfig = data[0];
   refreshBookingToggle();
-  updateBsStateSwitch();
   return true;
 }
 
@@ -3049,7 +3059,6 @@ async function toggleBookingOpen() {
   const open = cache.bookingConfig ? cache.bookingConfig.is_open : true;
   const next = !open;
   if (!next && !confirm('Fermer les réservations en ligne ? Les clients ne pourront plus réserver via le lien public.')) {
-    updateBsStateSwitch(); // remet l'interrupteur dans son état réel
     return;
   }
   if (await setBookingOpen(next)) {
@@ -3059,7 +3068,6 @@ async function toggleBookingOpen() {
 }
 
 document.getElementById('btnBookingToggle').addEventListener('click', toggleBookingOpen);
-document.getElementById('bsStateSwitch').addEventListener('click', toggleBookingOpen);
 
 // ----- Modale de réglages (horaires + capacité) -----
 const bookingSettingsModal = document.getElementById('bookingSettingsModal');
@@ -3071,7 +3079,6 @@ document.getElementById('btnBookingSettings').addEventListener('click', async ()
   document.getElementById('bs-close').value    = Number.isFinite(c.close_hour)   ? c.close_hour   : 19;
   document.getElementById('bs-step').value     = String(Number.isFinite(c.slot_minutes) ? c.slot_minutes : 60);
   document.getElementById('bs-capacity').value = Number.isFinite(c.capacity)     ? c.capacity     : 1;
-  updateBsStateSwitch();
   await loadClosedDays();
   const t = new Date();
   bscYear = t.getFullYear(); bscMonth = t.getMonth();
