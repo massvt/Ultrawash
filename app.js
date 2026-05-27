@@ -2924,7 +2924,7 @@ document.getElementById('btnBookingSettings').addEventListener('click', async ()
   bookingSettingsModal.classList.add('show');
 });
 document.getElementById('bsClose').addEventListener('click', closeBookingSettings);
-document.getElementById('bsCancel').addEventListener('click', closeBookingSettings);
+document.getElementById('bsCancel')?.addEventListener('click', closeBookingSettings);
 bookingSettingsModal.addEventListener('click', (e) => { if (e.target === bookingSettingsModal) closeBookingSettings(); });
 
 guardedSubmit(document.getElementById('formBookingSettings'), async (ev) => {
