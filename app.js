@@ -2872,11 +2872,11 @@ function resaWaLink(r) {
   if (!num) return null;
   const heure = (r.heure_prevue || '').slice(0, 5);
   const lignes = [
-    `Bonjour ${resaClientName(r)}, votre réservation chez UltraWash est confirmée ✅`,
-    `📅 ${fmtDate(r.date_prevue)} à ${heure}`,
+    `Bonjour ${resaClientName(r)}, votre réservation chez UltraWash est confirmée :`,
+    `Date : ${fmtDate(r.date_prevue)} à ${heure}`,
   ];
   const presta = r.type_lavage || (r.vehicule_type ? 'Lavage ' + r.vehicule_type : '');
-  if (presta) lignes.push(`🧽 ${presta}`);
+  if (presta) lignes.push(`Prestation : ${presta}`);
   lignes.push('À très vite !');
   return `https://wa.me/${num}?text=${encodeURIComponent(lignes.join('\n'))}`;
 }

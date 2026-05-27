@@ -229,10 +229,11 @@ function showConfirmation() {
   const nom = $('f-nom').value.trim();
   const lignes = [
     'Bonjour UltraWash, je confirme ma réservation :',
-    `👤 ${nom}`,
-    `📅 ${frDate(state.date)} à ${state.heure}`,
+    `Nom : ${nom}`,
+    `Date : ${frDate(state.date)} à ${state.heure}`,
   ];
-  if (type) lignes.push(`🧽 ${serviceLabel(type)}`);
+  if (type) lignes.push(`Prestation : ${serviceLabel(type)}`);
+  lignes.push('Merci !');
   const msg = lignes.join('\n');
   $('confirmWa').href = `https://wa.me/${ULTRAWASH_WA}?text=${encodeURIComponent(msg)}`;
 
