@@ -813,10 +813,14 @@ function renderChartServiceCat(entrees) {
   });
 }
 
-function periodKey(dateStr, heure, period) {
+function periodKey(dateStr, period) {
   const d = new Date(dateStr);
-  if (period === 'today') return heure ? heure.slice(0,2) + 'h' : '?';
-  if (period === 'week' || period === 'month') return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  // On groupe par jour (today/week/month), sinon par mois. Pas de découpage
+  // horaire : l'heure n'est pas renseignée sur les sorties, ce qui rendrait
+  // le graphe CA vs Dépenses incohérent.
+  if (period === 'today' || period === 'week' || period === 'month') {
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  }
   return d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
 }
 
@@ -826,12 +830,12 @@ function renderChartCA(entrees, sorties, period) {
 
   const caByKey = {};
   entrees.forEach(e => {
-    const key = periodKey(e.date, e.heure, period);
+    const key = periodKey(e.date, period);
     caByKey[key] = (caByKey[key] || 0) + Number(e.montant);
   });
   const depByKey = {};
   sorties.forEach(s => {
-    const key = periodKey(s.date, null, period);
+    const key = periodKey(s.date, period);
     depByKey[key] = (depByKey[key] || 0) + Number(s.montant);
   });
 
