@@ -23,11 +23,14 @@ let viewMonth = today.getMonth();
 const $ = (id) => document.getElementById(id);
 
 // Empêche la saisie de lettres dans le champ téléphone client (paste compris).
-// Filet UX — la canonicalisation ci-dessous reste la source de vérité avant envoi.
-document.getElementById('f-tel').addEventListener('input', (ev) => {
-  const cleaned = ev.target.value.replace(/\D+/g, '');
-  if (cleaned !== ev.target.value) ev.target.value = cleaned;
-});
+// Filet UX — la canonicalisation à la soumission reste la source de vérité.
+const fTelInput = document.getElementById('f-tel');
+if (fTelInput) {
+  fTelInput.addEventListener('input', (ev) => {
+    const cleaned = ev.target.value.replace(/\D+/g, '');
+    if (cleaned !== ev.target.value) ev.target.value = cleaned;
+  });
+}
 function ymd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

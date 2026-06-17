@@ -1349,10 +1349,16 @@ guardedSubmit(formEditSortie, async (ev) => {
 // Échappe + neutralise les attaques d'injection Excel : préfixe les cellules
 // commençant par =, +, -, @ avec une apostrophe pour qu'Excel ne les évalue
 // pas comme une formule (CWE-1236).
+// Caractères qui imposent le quoting d'une cellule CSV.
+// \r et \t inclus en plus de la RFC : un \r isolé (copier-coller Windows) ou
+// un \t dans un champ libre cassent les parseurs stricts (Excel selon locale,
+// csv Python par défaut).
+const CSV_WRAP_RE = /[",\n\r\t;]/;
+const CSV_INJECT_RE = /^[=+\-@]/;
 function csvEscape(v) {
   let s = String(v ?? '');
-  if (/^[=+\-@]/.test(s)) s = "'" + s;
-  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (CSV_INJECT_RE.test(s)) s = "'" + s;
+  return CSV_WRAP_RE.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 function downloadCsv(filename, header, rows) {
@@ -1404,7 +1410,7 @@ document.getElementById('el-export').addEventListener('click', () => {
     csvEscape(e.vehicule),
     csvEscape(e.type),
     csvEscape(e.telephone || ''),
-    e.montant,
+    csvEscape(e.montant),
     csvEscape(e.notes || ''),
   ].join(','));
   downloadCsv(`ultrawash_entrees_${periodTag(from, to)}.csv`, header, rows);
@@ -1419,7 +1425,7 @@ document.getElementById('sl-export').addEventListener('click', () => {
     s.date,
     csvEscape(s.categorie),
     csvEscape(s.description || ''),
-    s.montant,
+    csvEscape(s.montant),
   ].join(','));
   downloadCsv(`ultrawash_sorties_${periodTag(from, to)}.csv`, header, rows);
   toast('Export CSV téléchargé');
@@ -2495,8 +2501,8 @@ document.getElementById('btnExportClients').addEventListener('click', () => {
       csvEscape(c.email),
       csvEscape(c.adresse),
       csvEscape(plaques),
-      st.nb,
-      st.ca,
+      csvEscape(st.nb),
+      csvEscape(st.ca),
       st.last || '',
       csvEscape(c.notes),
     ].join(',');
