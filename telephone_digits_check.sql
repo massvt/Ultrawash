@@ -13,7 +13,7 @@
 -- 1. Vérification préalable : aucune ligne ne doit déjà violer la règle.
 --    Si l'un de ces SELECT renvoie des lignes, corriger AVANT d'appliquer
 --    les contraintes ci-dessous (sinon le ALTER échoue).
-SELECT 'entrees' AS table_name, id, telephone FROM entrees
+SELECT 'entrees' AS table_name, id::text AS id, telephone FROM entrees
   WHERE telephone IS NOT NULL AND telephone !~ '^[0-9]+$'
 UNION ALL
 SELECT 'clients', id::text, telephone FROM clients
