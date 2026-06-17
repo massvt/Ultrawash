@@ -291,6 +291,16 @@ nav {
   margin-bottom: 14px;
 }
 
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.list-header h3 { margin-bottom: 0; }
+
 .table {
   width: 100%;
   border-collapse: collapse;

@@ -440,7 +440,6 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.page === 'sorties') renderSortiesList();
     if (btn.dataset.page === 'clients') renderClientsPage();
     if (btn.dataset.page === 'reservations') renderReservationsPage();
-    if (btn.dataset.page === 'historique') renderHistorique();
     if (btn.dataset.page === 'tarifs') renderTarifsPage();
     if (btn.dataset.page === 'vehicules') renderVehiculesPage();
     if (btn.dataset.page === 'utilisateurs') renderUsersPage();
@@ -469,7 +468,6 @@ function renderActivePage() {
     case 'page-sorties':       renderSortiesList(); break;
     case 'page-clients':       renderClientsPage(); break;
     case 'page-reservations':  renderReservationsList(); break;
-    case 'page-historique':    renderHistorique(); break;
     case 'page-tarifs':        renderTarifsPage(); break;
     case 'page-vehicules':     renderVehiculesPage(); break;
     case 'page-utilisateurs':  renderUsersPage(); break;
@@ -1323,7 +1321,6 @@ guardedSubmit(formEditEntree, async (ev) => {
   closeEditModal();
   renderEntreesList();
   if (document.getElementById('page-dashboard').classList.contains('active')) renderDashboard();
-  if (document.getElementById('page-historique').classList.contains('active')) renderHistorique();
   toast('Lavage mis à jour !');
 });
 
@@ -1341,135 +1338,78 @@ guardedSubmit(formEditSortie, async (ev) => {
   closeEditModal();
   renderSortiesList();
   if (document.getElementById('page-dashboard').classList.contains('active')) renderDashboard();
-  if (document.getElementById('page-historique').classList.contains('active')) renderHistorique();
   toast('Dépense mise à jour !', '#f59e0b');
 });
 
-// ===== HISTORIQUE =====
-function getFilters() {
-  return {
-    kind: document.getElementById('f-kind').value,
-    from: document.getElementById('f-from').value,
-    to: document.getElementById('f-to').value,
-    vehicule: document.getElementById('f-vehicule').value,
-    telephone: document.getElementById('f-telephone').value.trim().toLowerCase(),
-    categorie: document.getElementById('f-categorie').value,
-  };
-}
-
-function applyFilters(ops, f) {
-  const entreeFilterActive = f.vehicule || f.telephone;
-  const sortieFilterActive = f.categorie;
-  return ops.filter(op => {
-    if (f.kind && op.kind !== f.kind) return false;
-    if (f.from && op.date < f.from) return false;
-    if (f.to && op.date > f.to) return false;
-    if (op.kind === 'entree') {
-      if (sortieFilterActive) return false;
-      if (f.vehicule && op.vehicule !== f.vehicule) return false;
-      if (f.telephone && !(op.telephone || '').toLowerCase().includes(f.telephone)) return false;
-    } else {
-      if (entreeFilterActive) return false;
-      if (f.categorie && op.categorie !== f.categorie) return false;
-    }
-    return true;
-  });
-}
-
-function updateFilterVisibility() {
-  const kind = document.getElementById('f-kind').value;
-  document.querySelectorAll('.filter-entree-only').forEach(el => {
-    el.style.display = (kind === '' || kind === 'entree') ? '' : 'none';
-  });
-  document.querySelectorAll('.filter-sortie-only').forEach(el => {
-    el.style.display = (kind === '' || kind === 'sortie') ? '' : 'none';
-  });
-}
-
-function renderHistorique() {
-  updateFilterVisibility();
-  const f = getFilters();
-  const all = [
-    ...DB.getEntrees().map(e => ({ ...e, kind: 'entree' })),
-    ...DB.getSorties().map(s => ({ ...s, kind: 'sortie' }))
-  ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  const filtered = applyFilters(all, f);
-
-  // Résumé
-  const totalEntrees = filtered.filter(o => o.kind === 'entree').reduce((a, o) => a + Number(o.montant), 0);
-  const totalSorties = filtered.filter(o => o.kind === 'sortie').reduce((a, o) => a + Number(o.montant), 0);
-  const summary = document.getElementById('filterSummary');
-  if (filtered.length > 0) {
-    summary.textContent = `${filtered.length} résultat${filtered.length > 1 ? 's' : ''} · Entrées : ${fmt(totalEntrees)} · Dépenses : ${fmt(totalSorties)}`;
-  } else {
-    summary.textContent = '';
-  }
-
-  const tbody = document.getElementById('historiqueTable');
-  const empty = document.getElementById('historiqueEmpty');
-  const { slice, page, totalPages, total } = paginate(filtered, 'histo');
-  if (total === 0) {
-    tbody.innerHTML = '';
-    empty.style.display = 'block';
-  } else {
-    empty.style.display = 'none';
-    tbody.innerHTML = slice.map(op => `
-      <tr>
-        <td>${fmtDate(op.date)}</td>
-        <td><span class="badge badge-${op.kind}">${op.kind === 'entree' ? 'Lavage' : 'Dépense'}</span></td>
-        <td>${op.kind === 'entree' ? (op.vehicule + ' – ' + op.type + (op.telephone ? ' · ' + escapeHtml(op.telephone) : '')) : (op.categorie + (op.description ? ' – ' + op.description : ''))}</td>
-        <td class="montant-${op.kind}">${op.kind === 'entree' ? '+' : '-'}${fmt(op.montant)}</td>
-      </tr>
-    `).join('');
-  }
-  renderPager('historiquePager', 'histo', total, page, totalPages, renderHistorique);
-}
-
-['f-kind','f-from','f-to','f-vehicule','f-telephone','f-categorie'].forEach(id => {
-  document.getElementById(id).addEventListener('input', withPageReset('histo', renderHistorique));
-  document.getElementById(id).addEventListener('change', withPageReset('histo', renderHistorique));
-});
-
-document.getElementById('f-reset').addEventListener('click', () => {
-  ['f-kind','f-from','f-to','f-vehicule','f-telephone','f-categorie'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  pagers.histo = 1;
-  renderHistorique();
-});
-
 // ===== EXPORT CSV =====
-document.getElementById('exportBtn').addEventListener('click', () => {
-  const f = getFilters();
-  const all = [
-    ...DB.getEntrees().map(e => ({ ...e, kind: 'entree' })),
-    ...DB.getSorties().map(s => ({ ...s, kind: 'sortie' }))
-  ].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const filtered = applyFilters(all, f);
+function csvEscape(v) {
+  const s = String(v ?? '');
+  return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
 
-  if (filtered.length === 0) {
-    toast('Aucune donnée à exporter', '#f59e0b');
-    return;
-  }
-
-  const header = 'Date,Type,Détail,Montant (FCFA)\n';
-  const rows = filtered.map(op => {
-    const label = op.kind === 'entree' ? 'Lavage' : 'Dépense';
-    const detail = op.kind === 'entree'
-      ? `${op.vehicule} - ${op.type}${op.telephone ? ' - ' + op.telephone : ''}`
-      : `${op.categorie}${op.description ? ' - ' + op.description : ''}`;
-    const sign = op.kind === 'entree' ? '' : '-';
-    return `${op.date},${label},"${detail}",${sign}${op.montant}`;
-  }).join('\n');
-
-  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+function downloadCsv(filename, header, rows) {
+  const content = header + '\n' + rows.join('\n');
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url;
-  const tag = f.from || f.to ? `${f.from || 'debut'}_${f.to || 'fin'}` : 'export';
-  a.download = `ultrawash_${tag}.csv`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function periodTag(from, to) {
+  return from || to ? `${from || 'debut'}_${to || 'fin'}` : 'export';
+}
+
+function getFilteredEntrees() {
+  const from = document.getElementById('el-from').value;
+  const to   = document.getElementById('el-to').value;
+  const tel  = document.getElementById('el-tel').value.trim().toLowerCase();
+  let list = DB.getEntrees();
+  if (from) list = list.filter(e => e.date >= from);
+  if (to)   list = list.filter(e => e.date <= to);
+  if (tel)  list = list.filter(e => (e.telephone || '').toLowerCase().includes(tel));
+  return { list, from, to };
+}
+
+function getFilteredSorties() {
+  const from = document.getElementById('sl-from').value;
+  const to   = document.getElementById('sl-to').value;
+  let list = DB.getSorties();
+  if (from) list = list.filter(s => s.date >= from);
+  if (to)   list = list.filter(s => s.date <= to);
+  return { list, from, to };
+}
+
+document.getElementById('el-export').addEventListener('click', () => {
+  const { list, from, to } = getFilteredEntrees();
+  if (list.length === 0) { toast('Aucune entrée à exporter', '#f59e0b'); return; }
+  const header = ['Date', 'Heure', 'Type de service', 'Prestation', 'Téléphone', 'Montant (FCFA)', 'Notes'].join(',');
+  const rows = list.map(e => [
+    e.date,
+    e.heure || '',
+    csvEscape(e.vehicule),
+    csvEscape(e.type),
+    csvEscape(e.telephone || ''),
+    e.montant,
+    csvEscape(e.notes || ''),
+  ].join(','));
+  downloadCsv(`ultrawash_entrees_${periodTag(from, to)}.csv`, header, rows);
+  toast('Export CSV téléchargé');
+});
+
+document.getElementById('sl-export').addEventListener('click', () => {
+  const { list, from, to } = getFilteredSorties();
+  if (list.length === 0) { toast('Aucune dépense à exporter', '#f59e0b'); return; }
+  const header = ['Date', 'Catégorie', 'Description', 'Montant (FCFA)'].join(',');
+  const rows = list.map(s => [
+    s.date,
+    csvEscape(s.categorie),
+    csvEscape(s.description || ''),
+    s.montant,
+  ].join(','));
+  downloadCsv(`ultrawash_sorties_${periodTag(from, to)}.csv`, header, rows);
   toast('Export CSV téléchargé');
 });
 
@@ -1716,14 +1656,6 @@ function refreshVehiculeSelects() {
     sel.innerHTML = htmlActifs;
     if (prev && actifs.some(v => v.nom === prev)) sel.value = prev;
   });
-  // Filtre historique : tous les types (même désactivés) pour les anciennes entrées
-  const fVeh = document.getElementById('f-vehicule');
-  if (fVeh) {
-    const prev = fVeh.value;
-    fVeh.innerHTML = '<option value="">Tous</option>' +
-      all.map(v => `<option value="${escapeHtml(v.nom)}">${escapeHtml(v.nom)}</option>`).join('');
-    fVeh.value = prev || '';
-  }
 }
 
 function activeVehiculeCats() {
