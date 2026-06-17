@@ -1124,6 +1124,19 @@ bindPrixAuto('e-type',  'e-montant');
 bindPrixAuto('ed-type', 'ed-montant');
 bindPrixAuto('r-type',  'r-montant');
 
+// Filtre les non-chiffres en temps réel sur les champs téléphone.
+// Enregistré AVANT les autres listeners pour qu'ils lisent une valeur déjà nettoyée.
+function bindDigitsOnly(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', (ev) => {
+    const cleaned = ev.target.value.replace(/\D+/g, '');
+    if (cleaned !== ev.target.value) ev.target.value = cleaned;
+  });
+}
+['login-telephone','e-telephone','el-tel','u-telephone','ed-telephone','cl-telephone','r-client-telephone']
+  .forEach(bindDigitsOnly);
+
 // Auto-rattachement par téléphone (debounced)
 let telLookupTimer = null;
 document.getElementById('e-telephone').addEventListener('input', (ev) => {
