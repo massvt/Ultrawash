@@ -1134,7 +1134,8 @@ function bindDigitsOnly(id) {
     if (cleaned !== ev.target.value) ev.target.value = cleaned;
   });
 }
-['login-telephone','e-telephone','el-tel','u-telephone','ed-telephone','cl-telephone','r-client-telephone']
+// login-telephone exclu : le champ accepte aussi un email (legacy) — voir formLogin.
+['e-telephone','el-tel','u-telephone','ed-telephone','cl-telephone','r-client-telephone']
   .forEach(bindDigitsOnly);
 
 // Auto-rattachement par téléphone (debounced)
@@ -1174,21 +1175,15 @@ document.getElementById('e-telephone').addEventListener('input', (ev) => {
 });
 
 function renderEntreesList() {
-  const from = document.getElementById('el-from').value;
-  const to   = document.getElementById('el-to').value;
-  const tel  = document.getElementById('el-tel').value.trim().toLowerCase();
-  let list = DB.getEntrees();
-  if (from) list = list.filter(e => e.date >= from);
-  if (to)   list = list.filter(e => e.date <= to);
-  if (tel)  list = list.filter(e => (e.telephone || '').toLowerCase().includes(tel));
+  const { list } = getFilteredEntrees();
   const { slice, page, totalPages, total } = paginate(list, 'entrees');
   const tbody = document.getElementById('entreesList');
   const canDelete = isAdmin();
   tbody.innerHTML = slice.map(e => `
     <tr>
       <td>${fmtDate(e.date)} ${e.heure || ''}</td>
-      <td>${e.vehicule}</td>
-      <td>${e.type}</td>
+      <td>${escapeHtml(e.vehicule || '')}</td>
+      <td>${escapeHtml(e.type || '')}</td>
       <td>${escapeHtml(e.telephone || '—')}</td>
       <td class="montant-entree">+${fmt(e.montant)}</td>
       <td>${canDelete ? `<button class="btn-edit" onclick="openEditEntree('${e.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delEntree('${e.id}')" title="Supprimer">✕</button>` : ''}</td>
@@ -1234,18 +1229,14 @@ guardedSubmit(document.getElementById('formSortie'), async (ev) => {
 });
 
 function renderSortiesList() {
-  const from = document.getElementById('sl-from').value;
-  const to   = document.getElementById('sl-to').value;
-  let list = DB.getSorties();
-  if (from) list = list.filter(s => s.date >= from);
-  if (to)   list = list.filter(s => s.date <= to);
+  const { list } = getFilteredSorties();
   const { slice, page, totalPages, total } = paginate(list, 'sorties');
   const tbody = document.getElementById('sortiesList');
   tbody.innerHTML = slice.map(s => `
     <tr>
       <td>${fmtDate(s.date)}</td>
-      <td>${s.categorie}</td>
-      <td>${s.description || '—'}</td>
+      <td>${escapeHtml(s.categorie || '')}</td>
+      <td>${escapeHtml(s.description || '—')}</td>
       <td class="montant-sortie">-${fmt(s.montant)}</td>
       <td><button class="btn-edit" onclick="openEditSortie('${s.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delSortie('${s.id}')" title="Supprimer">✕</button></td>
     </tr>
@@ -1355,20 +1346,28 @@ guardedSubmit(formEditSortie, async (ev) => {
 });
 
 // ===== EXPORT CSV =====
+// Échappe + neutralise les attaques d'injection Excel : préfixe les cellules
+// commençant par =, +, -, @ avec une apostrophe pour qu'Excel ne les évalue
+// pas comme une formule (CWE-1236).
 function csvEscape(v) {
-  const s = String(v ?? '');
+  let s = String(v ?? '');
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
   return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 function downloadCsv(filename, header, rows) {
-  const content = header + '\n' + rows.join('\n');
-  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
+  const content = '﻿' + header + '\n' + rows.join('\n');
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  // L'anchor doit être dans le DOM pour Safari/anciens FF.
+  // Revoke retardé pour ne pas tuer un download mis en file d'attente.
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function periodTag(from, to) {
@@ -2485,35 +2484,24 @@ document.getElementById('btnNewClient').addEventListener('click', () => openClie
 document.getElementById('btnExportClients').addEventListener('click', () => {
   const list = getFilteredClients();
   if (list.length === 0) { toast('Aucun client à exporter', '#f59e0b'); return; }
-  const escCsv = (v) => {
-    if (v === null || v === undefined) return '';
-    const s = String(v).replace(/"/g, '""');
-    return /[",\n;]/.test(s) ? `"${s}"` : s;
-  };
-  const header = 'Nom,Type,Telephone,Email,Adresse,Plaques,Nb lavages,CA total (FCFA),Derniere visite,Notes\n';
+  const header = ['Nom','Type','Telephone','Email','Adresse','Plaques','Nb lavages','CA total (FCFA)','Derniere visite','Notes'].join(',');
   const rows = list.map(c => {
     const st = clientStats(c.id);
     const plaques = cache.vehicules.filter(v => v.client_id === c.id).map(v => v.plaque).join(' | ');
     return [
-      escCsv(c.nom),
-      c.type,
-      escCsv(c.telephone),
-      escCsv(c.email),
-      escCsv(c.adresse),
-      escCsv(plaques),
+      csvEscape(c.nom),
+      csvEscape(c.type),
+      csvEscape(c.telephone),
+      csvEscape(c.email),
+      csvEscape(c.adresse),
+      csvEscape(plaques),
       st.nb,
       st.ca,
       st.last || '',
-      escCsv(c.notes),
+      csvEscape(c.notes),
     ].join(',');
-  }).join('\n');
-  const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `ultrawash_clients_${todayYmd()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  });
+  downloadCsv(`ultrawash_clients_${todayYmd()}.csv`, header, rows);
   toast('Export clients téléchargé');
 });
 

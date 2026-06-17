@@ -21,6 +21,13 @@ let viewYear = today.getFullYear();
 let viewMonth = today.getMonth();
 
 const $ = (id) => document.getElementById(id);
+
+// Empêche la saisie de lettres dans le champ téléphone client (paste compris).
+// Filet UX — la canonicalisation ci-dessous reste la source de vérité avant envoi.
+document.getElementById('f-tel').addEventListener('input', (ev) => {
+  const cleaned = ev.target.value.replace(/\D+/g, '');
+  if (cleaned !== ev.target.value) ev.target.value = cleaned;
+});
 function ymd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -170,7 +177,7 @@ $('bookForm').addEventListener('submit', async (ev) => {
   err.classList.add('hidden');
 
   const nom = $('f-nom').value.trim();
-  const tel = $('f-tel').value.trim();
+  const tel = $('f-tel').value.replace(/\D+/g, '');
   if (!nom) return showError('Merci d\'indiquer votre nom.');
   if (!tel) return showError('Merci d\'indiquer votre téléphone.');
   if (!state.date || !state.heure) return showError('Sélectionnez une date et un créneau.');
