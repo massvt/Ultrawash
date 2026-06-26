@@ -1311,14 +1311,28 @@ function openEditSortie(id) {
 guardedSubmit(formEditEntree, async (ev) => {
   ev.preventDefault();
   const id = document.getElementById('ed-id').value;
+  const telephone = document.getElementById('ed-telephone').value.trim();
+  const orig = DB.getEntrees().find(x => String(x.id) === String(id));
+
+  // Recalcule le rattachement client à partir du téléphone (le numéro a pu
+  // changer depuis l'ouverture du modal). Téléphone d'un client existant →
+  // on rattache ; numéro inconnu → on détache. Si le champ est vide, on
+  // conserve le rattachement d'origine pour ne pas détacher par accident.
+  let clientId = telephone ? null : (orig ? orig.client_id : null);
+  if (telephone) {
+    const { data } = await sb.from('clients').select('id').eq('telephone', telephone).limit(1);
+    if (data && data[0]) clientId = data[0].id;
+  }
+
   const row = {
     date: document.getElementById('ed-date').value,
     heure: document.getElementById('ed-heure').value,
     vehicule: document.getElementById('ed-vehicule').value,
     type: document.getElementById('ed-type').value,
     montant: Number(document.getElementById('ed-montant').value),
-    telephone: document.getElementById('ed-telephone').value.trim() || null,
+    telephone: telephone || null,
     notes: document.getElementById('ed-notes').value || null,
+    client_id: clientId,
   };
   const saved = await DB.updateEntree(id, row);
   if (!saved) return;
