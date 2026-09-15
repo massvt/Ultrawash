@@ -1245,9 +1245,10 @@ function renderEntreesList() {
       <td>${escapeHtml(e.type || '')}</td>
       <td>${escapeHtml(e.telephone || '—')}</td>
       <td class="montant-entree">+${fmt(e.montant)}</td>
+      <td class="created-by">${escapeHtml(userLabel(e.created_by))}</td>
       <td>${canDelete ? `<button class="btn-edit" onclick="openEditEntree('${e.id}')" title="Modifier">✎</button><button class="btn-del" onclick="delEntree('${e.id}')" title="Supprimer">✕</button>` : ''}</td>
     </tr>
-  `).join('') || '<tr><td colspan="6" class="empty-state">Aucun lavage enregistré</td></tr>';
+  `).join('') || '<tr><td colspan="7" class="empty-state">Aucun lavage enregistré</td></tr>';
   renderPager('entreesPager', 'entrees', total, page, totalPages, renderEntreesList);
 }
 
@@ -2075,11 +2076,28 @@ async function loadProfile() {
   return true;
 }
 
+// ----- Annuaire utilisateurs (created_by → « Prénom NOM ») -----
+// Rempli via la RPC user_names() (voir created_by.sql). Si la migration n'est
+// pas encore passée, la RPC échoue silencieusement et userLabel() renvoie « — ».
+const userNames = new Map();
+async function loadUserNames() {
+  try {
+    const { data, error } = await sb.rpc('user_names');
+    if (error || !Array.isArray(data)) return;
+    userNames.clear();
+    data.forEach(u => userNames.set(u.id, [u.prenom, u.nom].filter(Boolean).join(' ') || u.id.slice(0, 8)));
+  } catch (_) { /* migration absente : on affiche « — » */ }
+}
+function userLabel(uid) {
+  if (!uid) return '—';
+  return userNames.get(uid) || 'Utilisateur supprimé';
+}
+
 async function startApp() {
   applyRoleUI();
   document.body.classList.remove('auth-loading');
   document.body.classList.add('authed');
-  await DB.loadAll();
+  await Promise.all([DB.loadAll(), loadUserNames()]);
   refreshVehiculeSelects();
   refreshServiceSelects();
   refreshCategorySelectsInForms();
@@ -2859,6 +2877,8 @@ function openFiche(clientId) {
       <div><span>CA total</span><b class="montant-entree">${fmt(st.ca)}</b></div>
       <div><span>Dernière visite</span><b>${st.last ? fmtDate(st.last) : '—'}</b></div>
       <div><span>Notes</span><b>${escapeHtml(c.notes || '—')}</b></div>
+      <div><span>Fiche créée le</span><b>${c.created_at ? fmtDate(c.created_at.slice(0, 10)) : '—'}</b></div>
+      <div><span>Créée par</span><b>${escapeHtml(userLabel(c.created_by))}</b></div>
     </div>`;
 
   const vehs = cache.vehicules.filter(v => v.client_id === clientId);
@@ -2879,6 +2899,7 @@ function openFiche(clientId) {
         <td>${escapeHtml(e.vehicule || '')}</td>
         <td>${escapeHtml(e.type || '')}</td>
         <td class="montant-entree">+${fmt(e.montant)}</td>
+        <td class="created-by">${escapeHtml(userLabel(e.created_by))}</td>
       </tr>`).join('');
   }
   ficheModal.classList.add('show');

@@ -334,6 +334,8 @@ nav {
 .table th.th-sort.sorted::after { content: '↑'; opacity: 1; }
 .table th.th-sort.sorted.sorted-desc::after { content: '↓'; }
 
+.table td.created-by { color: var(--gray-400); font-size: .85rem; white-space: nowrap; }
+
 .table td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--gray-200);
