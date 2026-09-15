@@ -29,6 +29,23 @@ function normalizePhone(tel) {
   return d;
 }
 
+// Récupère TOUTES les lignes d'une requête en contournant le plafond PostgREST
+// (1000 lignes par défaut) : pagine par tranches de 1000 via .range() jusqu'à
+// épuisement. buildQuery() doit renvoyer une requête NEUVE à chaque appel
+// (ordre inclus) car .range() consomme la requête.
+async function fetchAllRows(buildQuery) {
+  const PAGE = 1000;
+  let from = 0, all = [];
+  for (;;) {
+    const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+    if (error) return { data: all, error };
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return { data: all, error: null };
+}
+
 const DB = {
   getEntrees:            () => cache.entrees,
   getSorties:            () => cache.sorties,
@@ -47,9 +64,9 @@ const DB = {
       { data: sc, error: sce },
       { data: vc, error: vce },
     ] = await Promise.all([
-      sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false }),
-      sb.from('sorties').select('*').order('date', { ascending: false }),
-      sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true }),
+      fetchAllRows(() => sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false })),
+      fetchAllRows(() => sb.from('sorties').select('*').order('date', { ascending: false })),
+      fetchAllRows(() => sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true })),
       sb.from('services').select('*').order('ordre', { ascending: true }),
       sb.from('vehicule_types').select('*').order('ordre', { ascending: true }),
       sb.from('service_categories').select('*').order('ordre', { ascending: true }),
@@ -355,8 +372,8 @@ const DB = {
 
   async loadClients() {
     const [{ data: c, error: ce }, { data: v, error: ve }] = await Promise.all([
-      sb.from('clients').select('*').order('nom', { ascending: true }),
-      sb.from('vehicules').select('*'),
+      fetchAllRows(() => sb.from('clients').select('*').order('nom', { ascending: true })),
+      fetchAllRows(() => sb.from('vehicules').select('*')),
     ]);
     if (ce) console.error('clients:', ce);
     if (ve) console.error('vehicules:', ve);
