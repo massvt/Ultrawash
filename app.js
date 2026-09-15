@@ -247,6 +247,10 @@ const DB = {
     const { data, error } = await sb.from('entrees').insert(row).select().single();
     if (error) { toast('Erreur : ' + error.message, '#e53935'); return null; }
     cache.entrees.unshift(data);
+    if (data.client_id) { // le trigger entrees_unarchive_client a réactivé le client côté base
+      const c = cache.clients.find(x => x.id === data.client_id);
+      if (c && c.archived_at) { c.archived_at = null; c.archived_by = null; toast(`${c.nom} réactivé (client archivé revenu)`, '#0d9e6e'); }
+    }
     return data;
   },
 
@@ -403,7 +407,9 @@ const DB = {
   async updateClient(id, row) {
     const { data, error } = await sb.from('clients').update(row).eq('id', id).select().single();
     if (error) {
-      toast(error.code === '23505' ? 'Ce numéro de téléphone est déjà attribué à un client' : 'Erreur : ' + error.message, '#e53935');
+      toast(error.code === '23505' ? 'Ce numéro de téléphone est déjà attribué à un client'
+          : /ARCHIVE_FORBIDDEN/.test(error.message || '') ? 'Seul un administrateur peut archiver ou réactiver un client'
+          : 'Erreur : ' + error.message, '#e53935');
       return null;
     }
     const i = cache.clients.findIndex(c => c.id === id);
@@ -413,7 +419,11 @@ const DB = {
 
   async delClient(id) {
     const { error } = await sb.from('clients').delete().eq('id', id);
-    if (error) { toast('Erreur : ' + error.message, '#e53935'); return false; }
+    if (error) {
+      const m = /CLIENT_HAS_LAVAGES:(\d+)/.exec(error.message || '');
+      toast(m ? `Suppression refusée : ce client a ${m[1]} lavage${m[1] > 1 ? 's' : ''}. Archivez-le plutôt.` : 'Erreur : ' + error.message, '#e53935');
+      return false;
+    }
     cache.clients = cache.clients.filter(c => c.id !== id);
     cache.vehicules = cache.vehicules.filter(v => v.client_id !== id);
     return true;
@@ -2588,10 +2598,13 @@ document.querySelectorAll('#page-clients th.th-sort').forEach(th => {
 function getFilteredClients() {
   const q = (document.getElementById('c-search').value || '').toLowerCase().trim();
   const typeFilter = document.getElementById('c-filter-type').value;
+  const archFilter = document.getElementById('c-filter-archive').value; // actifs | archives | tous
   const from = document.getElementById('c-from').value;
   const to   = document.getElementById('c-to').value;
 
   return cache.clients.filter(c => {
+    if (archFilter === 'actifs'   &&  c.archived_at) return false;
+    if (archFilter === 'archives' && !c.archived_at) return false;
     if (typeFilter && c.type !== typeFilter) return false;
     // Filtre dernière visite
     if (from || to) {
@@ -2628,8 +2641,8 @@ function renderClientsList() {
     const vehs = cache.vehicules.filter(v => v.client_id === c.id);
     const plaques = vehs.map(v => v.plaque).join(', ') || '—';
     return `
-      <tr class="row-click" data-cid="${c.id}">
-        <td><b>${escapeHtml(c.nom)}</b></td>
+      <tr class="row-click${c.archived_at ? ' row-archived' : ''}" data-cid="${c.id}">
+        <td><b>${escapeHtml(c.nom)}</b>${c.archived_at ? '<span class="badge-archive">Archivé</span>' : ''}</td>
         <td><span class="badge badge-${c.type}">${c.type === 'entreprise' ? 'Entreprise' : 'Particulier'}</span></td>
         <td>${escapeHtml(c.telephone || '—')}</td>
         <td>${escapeHtml(plaques)}</td>
@@ -2659,12 +2672,14 @@ function escapeHtml(s) {
 
 document.getElementById('c-search').addEventListener('input', withPageReset('clients', renderClientsList));
 document.getElementById('c-filter-type').addEventListener('change', withPageReset('clients', renderClientsList));
+document.getElementById('c-filter-archive').addEventListener('change', withPageReset('clients', renderClientsList));
 document.getElementById('c-from').addEventListener('change', withPageReset('clients', renderClientsList));
 document.getElementById('c-to').addEventListener('change', withPageReset('clients', renderClientsList));
 document.getElementById('c-reset').addEventListener('click', () => {
   pagers.clients = 1;
   document.getElementById('c-search').value = '';
   document.getElementById('c-filter-type').value = '';
+  document.getElementById('c-filter-archive').value = 'actifs';
   document.getElementById('c-from').value = '';
   document.getElementById('c-to').value = '';
   renderClientsList();
@@ -2675,13 +2690,14 @@ document.getElementById('btnNewClient').addEventListener('click', () => openClie
 document.getElementById('btnExportClients').addEventListener('click', () => {
   const list = getFilteredClients();
   if (list.length === 0) { toast('Aucun client à exporter', '#f59e0b'); return; }
-  const header = ['Nom','Type','Telephone','Email','Adresse','Plaques','Nb lavages','CA total (FCFA)','Derniere visite','Notes'].join(',');
+  const header = ['Nom','Type','Statut','Telephone','Email','Adresse','Plaques','Nb lavages','CA total (FCFA)','Derniere visite','Notes'].join(',');
   invalidateClientIndex();
   const rows = sortClients(list).map(({ c, st }) => {
     const plaques = cache.vehicules.filter(v => v.client_id === c.id).map(v => v.plaque).join(' | ');
     return [
       csvEscape(c.nom),
       csvEscape(c.type),
+      c.archived_at ? 'archive' : 'actif',
       csvEscape(c.telephone),
       csvEscape(c.email),
       csvEscape(c.adresse),
@@ -2865,8 +2881,24 @@ function openFiche(clientId) {
   viewingClientId = clientId;
   const c = cache.clients.find(x => x.id === clientId);
   if (!c) return;
-  document.getElementById('ficheTitle').textContent = c.nom;
+  document.getElementById('ficheTitle').innerHTML = escapeHtml(c.nom) + (c.archived_at ? '<span class="badge-archive">Archivé</span>' : '');
   const st = clientStats(clientId);
+  // Suppression réservée aux clients sans historique ; sinon on propose l'archivage
+  const btnDel  = document.getElementById('ficheDelete');
+  const btnArch = document.getElementById('ficheArchive');
+  const note    = document.getElementById('ficheArchiveNote');
+  btnDel.hidden = st.nb > 0;
+  btnArch.textContent = c.archived_at ? 'Réactiver le client' : 'Archiver le client';
+  btnArch.classList.toggle('btn-archive-active', !c.archived_at);
+  if (c.archived_at) {
+    note.hidden = false; note.className = 'fiche-archive-note is-archived';
+    note.textContent = `Client archivé le ${fmtDate(c.archived_at.slice(0, 10))} par ${userLabel(c.archived_by)}. Il n'apparaît plus dans la liste des clients actifs ; un nouveau lavage le réactive automatiquement.`;
+  } else if (st.nb > 0) {
+    note.hidden = false; note.className = 'fiche-archive-note';
+    note.textContent = `Ce client a ${st.nb} lavage${st.nb > 1 ? 's' : ''} enregistré${st.nb > 1 ? 's' : ''} : il ne peut pas être supprimé (l'historique et le CA doivent rester cohérents). Vous pouvez l'archiver.`;
+  } else {
+    note.hidden = true;
+  }
   document.getElementById('ficheInfo').innerHTML = `
     <div class="info-grid">
       <div><span>Type</span><b>${c.type === 'entreprise' ? 'Entreprise / Flotte' : 'Particulier'}</b></div>
@@ -2916,12 +2948,30 @@ document.getElementById('ficheEdit').addEventListener('click', () => {
 });
 document.getElementById('ficheDelete').addEventListener('click', async () => {
   if (!viewingClientId) return;
-  if (!confirm('Supprimer ce client ? Ses véhicules seront supprimés. Les lavages historiques sont conservés.')) return;
+  const st = clientStats(viewingClientId);
+  if (st.nb > 0) {
+    toast(`Impossible : ce client a ${st.nb} lavage${st.nb > 1 ? 's' : ''}. Archivez-le plutôt.`, '#f59e0b');
+    return;
+  }
+  if (!confirm('Supprimer définitivement ce client (aucun lavage enregistré) ? Ses véhicules seront supprimés.')) return;
   const ok = await DB.delClient(viewingClientId);
   if (!ok) return;
   closeFiche();
   renderClientsList();
   toast('Client supprimé', '#e53935');
+});
+
+document.getElementById('ficheArchive').addEventListener('click', async () => {
+  if (!viewingClientId) return;
+  const c = cache.clients.find(x => x.id === viewingClientId);
+  if (!c) return;
+  const archiving = !c.archived_at;
+  if (archiving && !confirm(`Archiver ${c.nom} ? Il disparaîtra de la liste des clients actifs. Son historique et son CA sont conservés, et l'archivage est réversible.`)) return;
+  const data = await DB.updateClient(viewingClientId, { archived_at: archiving ? new Date().toISOString() : null });
+  if (!data) return;
+  renderClientsList();
+  openFiche(viewingClientId); // rafraîchit statut + boutons
+  toast(archiving ? 'Client archivé' : 'Client réactivé', archiving ? '#64748b' : '#0d9e6e');
 });
 
 // ===== RESERVATIONS =====

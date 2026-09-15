@@ -334,6 +334,13 @@ nav {
 .table th.th-sort.sorted::after { content: '↑'; opacity: 1; }
 .table th.th-sort.sorted.sorted-desc::after { content: '↓'; }
 
+.badge-archive { background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 999px; font-size: .75rem; margin-left: 6px; vertical-align: middle; }
+tr.row-archived td { opacity: .6; }
+tr.row-archived td b { text-decoration: line-through; text-decoration-color: #94a3b8; }
+.fiche-archive-note { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: #fffbeb; color: #92400e; font-size: .88rem; border: 1px solid #fde68a; }
+.fiche-archive-note.is-archived { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.modal-actions .btn-outline.btn-archive-active { border-color: var(--orange); color: var(--orange); }
+
 .table td.created-by { color: var(--gray-400); font-size: .85rem; white-space: nowrap; }
 
 .table td {

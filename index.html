@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UltraWash — Gestion Lavage Auto</title>
-  <link rel="stylesheet" href="style.css?v=20260915c" />
+  <link rel="stylesheet" href="style.css?v=20260915d" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -334,6 +334,14 @@
             <option value="">Tous</option>
             <option value="particulier">Particuliers</option>
             <option value="entreprise">Entreprises / Flottes</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Statut</label>
+          <select id="c-filter-archive">
+            <option value="actifs">Actifs</option>
+            <option value="archives">Archivés</option>
+            <option value="tous">Tous</option>
           </select>
         </div>
         <div class="filter-group">
@@ -745,8 +753,10 @@
           <tbody id="ficheHistorique"></tbody>
         </table></div>
         <div id="ficheEmpty" class="empty-state">Aucun lavage enregistré pour ce client.</div>
+        <div id="ficheArchiveNote" class="fiche-archive-note" hidden></div>
         <div class="modal-actions">
           <button type="button" class="btn-outline" id="ficheEdit">Modifier</button>
+          <button type="button" class="btn-outline admin-only" id="ficheArchive">Archiver le client</button>
           <button type="button" class="btn-danger admin-only" id="ficheDelete">Supprimer le client</button>
         </div>
       </div>
@@ -900,6 +910,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20260915c"></script>
+  <script src="app.js?v=20260915d"></script>
 </body>
 </html>
