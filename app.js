@@ -380,6 +380,24 @@ const DB = {
     return true;
   },
 
+  // Rattache au client les lavages orphelins (client_id null) du même téléphone.
+  // Appelé après création/modif d'une fiche pour que les lavages saisis avant
+  // l'existence du client soient comptabilisés en base. Retourne le nb rattaché.
+  async linkOrphanEntrees(clientId, telephone) {
+    if (!clientId || !telephone) return 0;
+    const { data, error } = await sb.from('entrees')
+      .update({ client_id: clientId })
+      .eq('telephone', telephone)
+      .is('client_id', null)
+      .select('id');
+    if (error) { console.error('linkOrphanEntrees:', error); return 0; }
+    const ids = new Set((data || []).map(r => r.id));
+    if (ids.size) {
+      cache.entrees.forEach(e => { if (ids.has(e.id)) e.client_id = clientId; });
+    }
+    return ids.size;
+  },
+
   async addVehicule(row) {
     const { data, error } = await sb.from('vehicules').insert(row).select().single();
     if (error) {
@@ -2409,8 +2427,20 @@ async function renderClientsPage() {
   renderClientsList();
 }
 
+// Lavages d'un client : rattachés par client_id OU orphelins (client_id null)
+// portant le même téléphone. Couvre les lavages saisis avant la création de la
+// fiche, dont le rattachement n'a pas (encore) été rétabli en base.
+function entreesOfClient(clientId) {
+  const c = cache.clients.find(x => x.id === clientId);
+  const tel = c && c.telephone ? c.telephone : null;
+  return cache.entrees.filter(e =>
+    e.client_id === clientId ||
+    (tel && !e.client_id && e.telephone === tel)
+  );
+}
+
 function clientStats(clientId) {
-  const lavages = cache.entrees.filter(e => e.client_id === clientId);
+  const lavages = entreesOfClient(clientId);
   const ca = lavages.reduce((a, e) => a + Number(e.montant || 0), 0);
   const last = lavages.length ? lavages[0].date : null; // entrees triées desc
   return { nb: lavages.length, ca, last };
@@ -2681,6 +2711,8 @@ guardedSubmit(document.getElementById('formClient'), async (ev) => {
     }
   }
   if (!client) return;
+  // Rattache les lavages orphelins du même téléphone (saisis avant la fiche).
+  if (client.telephone) await DB.linkOrphanEntrees(client.id, client.telephone);
   closeClientModal();
   renderClientsList();
   toast(editingClientId ? 'Client mis à jour' : 'Client créé');
@@ -2710,7 +2742,7 @@ function openFiche(clientId) {
     ? vehs.map(v => `<span class="veh-pill"><b>${escapeHtml(v.plaque)}</b>${v.marque || v.modele ? ' · ' + escapeHtml([v.marque, v.modele].filter(Boolean).join(' ')) : ''}</span>`).join('')
     : '<div class="empty-inline">Aucun véhicule.</div>';
 
-  const lavages = cache.entrees.filter(e => e.client_id === clientId);
+  const lavages = entreesOfClient(clientId);
   const tbody = document.getElementById('ficheHistorique');
   const empty = document.getElementById('ficheEmpty');
   if (lavages.length === 0) {
