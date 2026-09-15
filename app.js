@@ -33,16 +33,23 @@ function normalizePhone(tel) {
 // (1000 lignes par défaut) : pagine par tranches de 1000 via .range() jusqu'à
 // épuisement. buildQuery() doit renvoyer une requête NEUVE à chaque appel
 // (ordre inclus) car .range() consomme la requête.
+//
+// IMPORTANT : buildQuery() DOIT ordonner sur une clé UNIQUE en dernier critère
+// (typiquement .order('id')). Sans clé unique, deux lignes ex æquo à la frontière
+// d'une page peuvent être sautées (perte de données) ou dupliquées entre deux
+// requêtes HTTP distinctes — d'où l'ajout systématique de .order('id') aux appels.
 async function fetchAllRows(buildQuery) {
   const PAGE = 1000;
+  const MAX_PAGES = 1000; // garde-fou anti-boucle (jusqu'à 1M lignes)
   let from = 0, all = [];
-  for (;;) {
+  for (let page = 0; page < MAX_PAGES; page++) {
     const { data, error } = await buildQuery().range(from, from + PAGE - 1);
     if (error) return { data: all, error };
     all = all.concat(data || []);
-    if (!data || data.length < PAGE) break;
+    if (!data || data.length < PAGE) return { data: all, error: null };
     from += PAGE;
   }
+  console.error('fetchAllRows: MAX_PAGES atteint — chargement possiblement tronqué');
   return { data: all, error: null };
 }
 
@@ -64,13 +71,13 @@ const DB = {
       { data: sc, error: sce },
       { data: vc, error: vce },
     ] = await Promise.all([
-      fetchAllRows(() => sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false })),
-      fetchAllRows(() => sb.from('sorties').select('*').order('date', { ascending: false })),
-      fetchAllRows(() => sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true })),
-      sb.from('services').select('*').order('ordre', { ascending: true }),
-      sb.from('vehicule_types').select('*').order('ordre', { ascending: true }),
-      sb.from('service_categories').select('*').order('ordre', { ascending: true }),
-      sb.from('vehicule_categories').select('*').order('ordre', { ascending: true }),
+      fetchAllRows(() => sb.from('entrees').select('*').order('date', { ascending: false }).order('heure', { ascending: false }).order('id', { ascending: true })),
+      fetchAllRows(() => sb.from('sorties').select('*').order('date', { ascending: false }).order('id', { ascending: true })),
+      fetchAllRows(() => sb.from('reservations').select('*').order('date_prevue', { ascending: true }).order('heure_prevue', { ascending: true }).order('id', { ascending: true })),
+      fetchAllRows(() => sb.from('services').select('*').order('ordre', { ascending: true }).order('nom', { ascending: true })),
+      fetchAllRows(() => sb.from('vehicule_types').select('*').order('ordre', { ascending: true }).order('nom', { ascending: true })),
+      fetchAllRows(() => sb.from('service_categories').select('*').order('ordre', { ascending: true }).order('nom', { ascending: true })),
+      fetchAllRows(() => sb.from('vehicule_categories').select('*').order('ordre', { ascending: true }).order('nom', { ascending: true })),
     ]);
     if (ee)  console.error('entrees:', ee);
     if (se)  console.error('sorties:', se);
@@ -372,8 +379,8 @@ const DB = {
 
   async loadClients() {
     const [{ data: c, error: ce }, { data: v, error: ve }] = await Promise.all([
-      fetchAllRows(() => sb.from('clients').select('*').order('nom', { ascending: true })),
-      fetchAllRows(() => sb.from('vehicules').select('*')),
+      fetchAllRows(() => sb.from('clients').select('*').order('nom', { ascending: true }).order('id', { ascending: true })),
+      fetchAllRows(() => sb.from('vehicules').select('*').order('id', { ascending: true })),
     ]);
     if (ce) console.error('clients:', ce);
     if (ve) console.error('vehicules:', ve);
@@ -2912,7 +2919,7 @@ async function renderReservationsPage() {
 
 // Jours fermés (off / fériés) — chargés dans un Set pour le calendrier interne
 async function loadClosedDays() {
-  const { data } = await sb.from('booking_closed_days').select('day').gte('day', todayYmd());
+  const { data } = await fetchAllRows(() => sb.from('booking_closed_days').select('day').gte('day', todayYmd()).order('day', { ascending: true }));
   closedDaysSet = new Set((data || []).map(r => r.day));
   return closedDaysSet;
 }
@@ -2977,7 +2984,7 @@ async function toggleClosedDay(key) {
 async function renderClosedDays() {
   const wrap = document.getElementById('bs-day-list');
   if (!wrap) return;
-  const { data } = await sb.from('booking_closed_days').select('*').gte('day', todayYmd()).order('day');
+  const { data } = await fetchAllRows(() => sb.from('booking_closed_days').select('*').gte('day', todayYmd()).order('day', { ascending: true }));
   const list = data || [];
   if (!list.length) {
     wrap.innerHTML = '<p class="resa-client-note" style="margin:0">Aucun jour fermé à venir.</p>';
