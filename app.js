@@ -14,6 +14,21 @@ const cache = { entrees: [], sorties: [], clients: [], vehicules: [], reservatio
 // Map nom_service → prix (rempli au boot, utilisé pour pré-remplir le montant)
 const PRIX = {};
 
+// Forme canonique d'un numéro de téléphone : chiffres uniquement, format
+// international sans « + ». Hypothèse Sénégal (+221) pour un local à 9 chiffres.
+// Utilisée à CHAQUE écriture en base et comme clé de comparaison/lookup, pour
+// qu'un même numéro saisi sous des formes différentes (77…, 0077…, +221 77…,
+// 22177…) désigne toujours le même client. Retourne null si vide.
+function normalizePhone(tel) {
+  let d = String(tel || '').replace(/\D/g, '');
+  if (!d) return null;
+  if (d.startsWith('221')) return d;
+  d = d.replace(/^0+/, '');
+  if (!d) return null;
+  if (d.length === 9) return '221' + d;
+  return d;
+}
+
 const DB = {
   getEntrees:            () => cache.entrees,
   getSorties:            () => cache.sorties,
@@ -384,6 +399,7 @@ const DB = {
   // Appelé après création/modif d'une fiche pour que les lavages saisis avant
   // l'existence du client soient comptabilisés en base. Retourne le nb rattaché.
   async linkOrphanEntrees(clientId, telephone) {
+    telephone = normalizePhone(telephone);
     if (!clientId || !telephone) return 0;
     const { data, error } = await sb.from('entrees')
       .update({ client_id: clientId })
@@ -1093,7 +1109,7 @@ guardedSubmit(document.getElementById('formEntree'), async (ev) => {
     return;
   }
 
-  const telephone = (document.getElementById('e-telephone').value || '').trim();
+  const telephone = normalizePhone(document.getElementById('e-telephone').value);
   let clientId   = document.getElementById('e-client-id').value || null;
   let vehiculeId = document.getElementById('e-vehicule-id').value || null;
 
@@ -1168,11 +1184,12 @@ document.getElementById('e-telephone').addEventListener('input', (ev) => {
   vehHidden.value = '';
   hint.innerHTML = '';
   if (telephone.length < 4) return;
+  const telNorm = normalizePhone(telephone);
   telLookupTimer = setTimeout(async () => {
     const { data } = await sb
       .from('clients')
       .select('id, nom, type, telephone, vehicules(id, plaque)')
-      .eq('telephone', telephone)
+      .eq('telephone', telNorm)
       .limit(1);
     const c = data && data[0];
     if (c) {
@@ -1186,7 +1203,7 @@ document.getElementById('e-telephone').addEventListener('input', (ev) => {
       hint.innerHTML = `<span class="hint-new">Numéro inconnu — sera enregistré sans fiche client. <a href="#" id="hint-create-client">Créer une fiche ?</a></span>`;
       document.getElementById('hint-create-client').addEventListener('click', (e) => {
         e.preventDefault();
-        openClientModal(null, { telephone });
+        openClientModal(null, { telephone: telNorm || telephone });
       });
     }
   }, 350);
@@ -1329,7 +1346,7 @@ function openEditSortie(id) {
 guardedSubmit(formEditEntree, async (ev) => {
   ev.preventDefault();
   const id = document.getElementById('ed-id').value;
-  const telephone = document.getElementById('ed-telephone').value.trim();
+  const telephone = normalizePhone(document.getElementById('ed-telephone').value);
   const orig = DB.getEntrees().find(x => String(x.id) === String(id));
 
   // Recalcule le rattachement client à partir du téléphone (le numéro a pu
@@ -2432,10 +2449,10 @@ async function renderClientsPage() {
 // fiche, dont le rattachement n'a pas (encore) été rétabli en base.
 function entreesOfClient(clientId) {
   const c = cache.clients.find(x => x.id === clientId);
-  const tel = c && c.telephone ? c.telephone : null;
+  const tel = c ? normalizePhone(c.telephone) : null;
   return cache.entrees.filter(e =>
     e.client_id === clientId ||
-    (tel && !e.client_id && e.telephone === tel)
+    (tel && !e.client_id && normalizePhone(e.telephone) === tel)
   );
 }
 
@@ -2681,7 +2698,7 @@ guardedSubmit(document.getElementById('formClient'), async (ev) => {
   const row = {
     type:      document.getElementById('cl-type').value,
     nom:       document.getElementById('cl-nom').value.trim(),
-    telephone: document.getElementById('cl-telephone').value.trim() || null,
+    telephone: normalizePhone(document.getElementById('cl-telephone').value),
     email:     document.getElementById('cl-email').value.trim() || null,
     adresse:   document.getElementById('cl-adresse').value.trim() || null,
     notes:     document.getElementById('cl-notes').value.trim() || null,
@@ -2689,7 +2706,7 @@ guardedSubmit(document.getElementById('formClient'), async (ev) => {
 
   // Téléphone unique : refuser s'il est déjà attribué à un autre client
   if (row.telephone) {
-    let dup = cache.clients.find(c => c.telephone === row.telephone && c.id !== editingClientId);
+    let dup = cache.clients.find(c => normalizePhone(c.telephone) === row.telephone && c.id !== editingClientId);
     if (!dup) {
       let q = sb.from('clients').select('id, nom').eq('telephone', row.telephone);
       if (editingClientId) q = q.neq('id', editingClientId);
@@ -2838,15 +2855,9 @@ function resaClientPhone(r) {
   }
   return r.client_telephone || null;
 }
-// Normalise un numéro saisi librement vers le format wa.me (international, sans +)
-// Hypothèse Sénégal (+221) pour un numéro local à 9 chiffres.
+// Numéro au format wa.me (international, sans +) — même forme que la canonique.
 function waNumber(tel) {
-  let d = String(tel || '').replace(/\D/g, '');
-  if (!d) return null;
-  if (d.startsWith('221')) return d;
-  d = d.replace(/^0+/, '');
-  if (d.length === 9) return '221' + d;
-  return d;
+  return normalizePhone(tel);
 }
 function resaClientName(r) {
   if (r.client_id) {
@@ -3231,10 +3242,10 @@ async function convertResaToEntree(r) {
   // sinon une résa marquée "arrivé" en retard fausse le CA du jour.
   const now = new Date();
   // Téléphone : depuis le snapshot résa, sinon depuis la fiche client liée
-  let telephone = r.client_telephone || null;
+  let telephone = normalizePhone(r.client_telephone);
   if (!telephone && r.client_id) {
     const c = cache.clients.find(x => x.id === r.client_id);
-    if (c) telephone = c.telephone || null;
+    if (c) telephone = normalizePhone(c.telephone);
   }
   const row = {
     date: todayYmd(),
@@ -3520,7 +3531,7 @@ guardedSubmit(document.getElementById('formResa'), async (ev) => {
 
   const nom = document.getElementById('r-client-nom').value.trim();
   if (!nom) { toast('Nom du client requis', '#e53935'); return; }
-  const telephone = document.getElementById('r-client-telephone').value.trim() || null;
+  const telephone = normalizePhone(document.getElementById('r-client-telephone').value);
 
   const row = {
     date_prevue:  dateVal,
@@ -3553,7 +3564,7 @@ guardedSubmit(document.getElementById('formResa'), async (ev) => {
   if (!cache.clientsLoaded) await DB.loadClients();
   let clientId = document.getElementById('r-client-id').value || null;
   if (!clientId && telephone) {
-    const existing = cache.clients.find(c => c.telephone === telephone);
+    const existing = cache.clients.find(c => normalizePhone(c.telephone) === telephone);
     if (existing) clientId = existing.id;
   }
   if (!clientId) {

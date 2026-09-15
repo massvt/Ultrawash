@@ -22,6 +22,19 @@ let viewMonth = today.getMonth();
 
 const $ = (id) => document.getElementById(id);
 
+// Forme canonique d'un numéro : chiffres, international sans « + ».
+// DOIT rester alignée avec normalizePhone() de app.js pour qu'une résa publique
+// et une fiche CRM portant le même numéro se rattachent bien au même client.
+function normalizePhone(tel) {
+  let d = String(tel || '').replace(/\D/g, '');
+  if (!d) return null;
+  if (d.startsWith('221')) return d;
+  d = d.replace(/^0+/, '');
+  if (!d) return null;
+  if (d.length === 9) return '221' + d;
+  return d;
+}
+
 // Empêche la saisie de lettres dans le champ téléphone client (paste compris).
 // Filet UX — la canonicalisation à la soumission reste la source de vérité.
 const fTelInput = document.getElementById('f-tel');
@@ -180,7 +193,7 @@ $('bookForm').addEventListener('submit', async (ev) => {
   err.classList.add('hidden');
 
   const nom = $('f-nom').value.trim();
-  const tel = $('f-tel').value.replace(/\D+/g, '');
+  const tel = normalizePhone($('f-tel').value);
   if (!nom) return showError('Merci d\'indiquer votre nom.');
   if (!tel) return showError('Merci d\'indiquer votre téléphone.');
   if (!state.date || !state.heure) return showError('Sélectionnez une date et un créneau.');
