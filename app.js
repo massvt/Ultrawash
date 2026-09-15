@@ -2471,13 +2471,35 @@ async function renderClientsPage() {
 // Lavages d'un client : rattachés par client_id OU orphelins (client_id null)
 // portant le même téléphone. Couvre les lavages saisis avant la création de la
 // fiche, dont le rattachement n'a pas (encore) été rétabli en base.
+// Index des entrées par client (id) et par téléphone normalisé (entrées orphelines).
+// Construit en une passe au début de chaque rendu de la liste (voir renderClientsList),
+// pour éviter un filter() complet des entrées par client à chaque ligne ou comparaison de tri.
+let clientEntreesIndex = null;
+function invalidateClientIndex() { clientEntreesIndex = null; }
+function buildClientEntreesIndex() {
+  const byId = new Map(), byTel = new Map();
+  for (const e of cache.entrees) {            // entrees triées date desc → ordre conservé
+    if (e.client_id) {
+      if (!byId.has(e.client_id)) byId.set(e.client_id, []);
+      byId.get(e.client_id).push(e);
+    } else {
+      const tel = normalizePhone(e.telephone);
+      if (!tel) continue;
+      if (!byTel.has(tel)) byTel.set(tel, []);
+      byTel.get(tel).push(e);
+    }
+  }
+  clientEntreesIndex = { byId, byTel };
+}
 function entreesOfClient(clientId) {
+  if (!clientEntreesIndex) buildClientEntreesIndex();
   const c = cache.clients.find(x => x.id === clientId);
   const tel = c ? normalizePhone(c.telephone) : null;
-  return cache.entrees.filter(e =>
-    e.client_id === clientId ||
-    (tel && !e.client_id && normalizePhone(e.telephone) === tel)
-  );
+  const own = clientEntreesIndex.byId.get(clientId) || [];
+  const orphan = tel ? (clientEntreesIndex.byTel.get(tel) || []) : [];
+  if (!orphan.length) return own;
+  if (!own.length) return orphan;
+  return own.concat(orphan).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
 function clientStats(clientId) {
@@ -2486,6 +2508,64 @@ function clientStats(clientId) {
   const last = lavages.length ? lavages[0].date : null; // entrees triées desc
   return { nb: lavages.length, ca, last };
 }
+
+// ----- Tri de la liste clients -----
+const clientsSort = { key: 'nom', dir: 1 }; // dir: 1 asc, -1 desc
+const CLIENT_SORT_DEFAULT_DIR = { nom: 1, type: 1, telephone: 1, vehicules: -1, lavages: -1, ca: -1, last: -1 };
+
+function clientSortValue(c, key, st) {
+  switch (key) {
+    case 'nom':       return (c.nom || '').toLowerCase();
+    case 'type':      return c.type === 'entreprise' ? 'Entreprise' : 'Particulier';
+    case 'telephone': return normalizePhone(c.telephone) || '';
+    case 'vehicules': return cache.vehicules.reduce((n, v) => n + (v.client_id === c.id ? 1 : 0), 0);
+    case 'lavages':   return st.nb;
+    case 'ca':        return st.ca;
+    case 'last':      return st.last || '';
+    default:          return '';
+  }
+}
+
+function sortClients(list) {
+  const { key, dir } = clientsSort;
+  const collator = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
+  const rows = list.map(c => {
+    const st = clientStats(c.id);
+    return { c, st, v: clientSortValue(c, key, st) };
+  });
+  rows.sort((a, b) => {
+    let r;
+    if (typeof a.v === 'number' && typeof b.v === 'number') r = a.v - b.v;
+    else {
+      // Valeurs vides (jamais venu, sans téléphone) toujours en fin de liste
+      const ae = a.v === '' || a.v == null, be = b.v === '' || b.v == null;
+      if (ae !== be) return ae ? 1 : -1;
+      r = collator.compare(String(a.v), String(b.v));
+    }
+    if (r !== 0) return r * dir;
+    return collator.compare(a.c.nom || '', b.c.nom || ''); // départage : toujours par nom A→Z
+  });
+  return rows;
+}
+
+function updateClientsSortHeaders() {
+  document.querySelectorAll('#page-clients th.th-sort').forEach(th => {
+    const active = th.dataset.sort === clientsSort.key;
+    th.classList.toggle('sorted', active);
+    th.classList.toggle('sorted-desc', active && clientsSort.dir === -1);
+    th.setAttribute('aria-sort', active ? (clientsSort.dir === 1 ? 'ascending' : 'descending') : 'none');
+  });
+}
+
+document.querySelectorAll('#page-clients th.th-sort').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (clientsSort.key === key) clientsSort.dir = -clientsSort.dir;
+    else { clientsSort.key = key; clientsSort.dir = CLIENT_SORT_DEFAULT_DIR[key] || 1; }
+    pagers.clients = 1;
+    renderClientsList();
+  });
+});
 
 function getFilteredClients() {
   const q = (document.getElementById('c-search').value || '').toLowerCase().trim();
@@ -2513,6 +2593,7 @@ function getFilteredClients() {
 function renderClientsList() {
   const tbody = document.getElementById('clientsList');
   const empty = document.getElementById('clientsEmpty');
+  invalidateClientIndex(); // les entrées/clients ont pu changer depuis le dernier rendu
   const list = getFilteredClients();
 
   if (list.length === 0) {
@@ -2522,10 +2603,11 @@ function renderClientsList() {
   }
   empty.style.display = 'none';
 
-  const { slice, page, totalPages, total } = paginate(list, 'clients');
-  tbody.innerHTML = slice.map(c => {
+  updateClientsSortHeaders();
+  const sorted = sortClients(list);
+  const { slice, page, totalPages, total } = paginate(sorted, 'clients');
+  tbody.innerHTML = slice.map(({ c, st }) => {
     const vehs = cache.vehicules.filter(v => v.client_id === c.id);
-    const st = clientStats(c.id);
     const plaques = vehs.map(v => v.plaque).join(', ') || '—';
     return `
       <tr class="row-click" data-cid="${c.id}">
@@ -2576,8 +2658,8 @@ document.getElementById('btnExportClients').addEventListener('click', () => {
   const list = getFilteredClients();
   if (list.length === 0) { toast('Aucun client à exporter', '#f59e0b'); return; }
   const header = ['Nom','Type','Telephone','Email','Adresse','Plaques','Nb lavages','CA total (FCFA)','Derniere visite','Notes'].join(',');
-  const rows = list.map(c => {
-    const st = clientStats(c.id);
+  invalidateClientIndex();
+  const rows = sortClients(list).map(({ c, st }) => {
     const plaques = cache.vehicules.filter(v => v.client_id === c.id).map(v => v.plaque).join(' | ');
     return [
       csvEscape(c.nom),
@@ -2761,6 +2843,7 @@ guardedSubmit(document.getElementById('formClient'), async (ev) => {
 
 // ----- Fiche client -----
 function openFiche(clientId) {
+  invalidateClientIndex();
   viewingClientId = clientId;
   const c = cache.clients.find(x => x.id === clientId);
   if (!c) return;

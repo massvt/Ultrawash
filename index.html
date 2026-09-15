@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UltraWash — Gestion Lavage Auto</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260915b" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -353,13 +353,13 @@
       <div class="table-wrap"><table class="table">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>Type</th>
-            <th>Téléphone</th>
-            <th>Véhicules</th>
-            <th>Lavages</th>
-            <th>CA total</th>
-            <th>Dernière visite</th>
+            <th class="th-sort" data-sort="nom">Nom</th>
+            <th class="th-sort" data-sort="type">Type</th>
+            <th class="th-sort" data-sort="telephone">Téléphone</th>
+            <th class="th-sort" data-sort="vehicules">Véhicules</th>
+            <th class="th-sort" data-sort="lavages">Lavages</th>
+            <th class="th-sort" data-sort="ca">CA total</th>
+            <th class="th-sort" data-sort="last">Dernière visite</th>
             <th></th>
           </tr>
         </thead>
@@ -900,6 +900,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=20260915"></script>
+  <script src="app.js?v=20260915b"></script>
 </body>
 </html>

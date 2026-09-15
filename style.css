@@ -318,6 +318,22 @@ nav {
   letter-spacing: .04em;
 }
 
+.table th.th-sort {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.table th.th-sort::after {
+  content: '↕';
+  margin-left: 6px;
+  opacity: .35;
+  font-size: .8em;
+}
+.table th.th-sort:hover { color: var(--text); }
+.table th.th-sort.sorted { color: var(--blue); }
+.table th.th-sort.sorted::after { content: '↑'; opacity: 1; }
+.table th.th-sort.sorted.sorted-desc::after { content: '↓'; }
+
 .table td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--gray-200);
